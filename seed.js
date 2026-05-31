@@ -11,15 +11,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const Ticket = require(path.join(__dirname, 'backend', 'models', 'Ticket'));
 const Pago = require(path.join(__dirname, 'backend', 'models', 'Pago'));
-
-function generarCodigo() {
-  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let resultado = '';
-  for (let i = 0; i < 8; i++) {
-    resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-  }
-  return resultado;
-}
+const { generarCodigo } = require(path.join(__dirname, 'backend', 'utils', 'codigoGenerator'));
 
 const seed = async () => {
   try {
