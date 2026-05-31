@@ -2,17 +2,9 @@ const express = require('express');
 const Ticket = require('../models/Ticket');
 const Pago = require('../models/Pago');
 const verificarToken = require('../middleware/auth');
+const { generarCodigo } = require('../utils/codigoGenerator');
 
 const router = express.Router();
-
-function generarCodigo() {
-  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let resultado = '';
-  for (let i = 0; i < 8; i++) {
-    resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-  }
-  return resultado;
-}
 
 function calcularMontoAPagar(minutosTranscurridos) {
   if (minutosTranscurridos <= 5) return 0;

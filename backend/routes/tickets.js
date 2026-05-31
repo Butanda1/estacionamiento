@@ -2,17 +2,9 @@ const express = require('express');
 const Ticket = require('../models/Ticket');
 const verificarToken = require('../middleware/auth');
 const { checkExpiredTickets } = require('../utils/expiryScheduler');
+const { generarCodigo } = require('../utils/codigoGenerator');
 
 const router = express.Router();
-
-function generarCodigo() {
-  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let resultado = '';
-  for (let i = 0; i < 8; i++) {
-    resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-  }
-  return resultado;
-}
 
 // POST /api/tickets/entrada
 // Endpoint usado por el Arduino de entrada via ESP8266
@@ -50,16 +42,19 @@ router.post('/entrada', async (req, res) => {
 
 // POST /api/tickets/validar-salida
 // Endpoint usado por el Arduino de salida via ESP8266
+// Lógica:
+//  - < 5 min estacionado  -> auto-exento, abre barrera
+//  - >= 5 min y PAGADO/EXENTO -> abre barrera
+//  - >= 5 min y NO_PAGADO  -> denegado
 router.post('/validar-salida', async (req, res) => {
   try {
-    // Asegurar que los tickets vencidos se actualicen antes de validar la salida
     await checkExpiredTickets();
 
     const { id_ticket, ticket_id, _id } = req.body;
     const codigoInput = (_id || id_ticket || ticket_id || '').trim().toUpperCase();
 
     if (!codigoInput) {
-      return res.status(400).json({ error: 'Código de ticket es requerido' });
+      return res.status(400).json({ autorizado: false, mensaje: 'Codigo de ticket requerido' });
     }
 
     const ticket = await Ticket.findById(codigoInput);
@@ -69,36 +64,52 @@ router.post('/validar-salida', async (req, res) => {
     }
 
     if (!ticket.activo && ticket.fecha_salida) {
-      return res.status(400).json({ autorizado: false, mensaje: 'Este ticket ya fue usado para salir' });
+      return res.json({ autorizado: false, mensaje: 'Ticket ya utilizado' });
     }
 
-    if (ticket.estado_pago === 'PAGADO' || ticket.estado_pago === 'EXENTO') {
+    if (ticket.estado_pago === 'PERDIDO' || ticket.estado_pago === 'Perdido_Sistema') {
+      return res.json({ autorizado: false, mensaje: 'Ticket perdido o vencido por el sistema' });
+    }
+
+    const ahora = new Date();
+    const minutosTranscurridos = Math.round((ahora - ticket.fecha_entrada) / 60000);
+
+    if (minutosTranscurridos <= 5) {
+      ticket.estado_pago = 'EXENTO';
       ticket.activo = false;
-      ticket.fecha_salida = new Date();
+      ticket.fecha_salida = ahora;
       await ticket.save();
 
       return res.json({
         autorizado: true,
         abrir_barrera: true,
-        mensaje: 'Salida autorizada. Barrera abierta.',
-        ticket: {
-          ...ticket.toObject(),
-          id_ticket: ticket._id
-        },
+        mensaje: 'Excelente, muy bien',
+        estado: 'EXENTO',
+        tiempo_estacionado_minutos: minutosTranscurridos,
       });
     }
 
-    if (ticket.estado_pago === 'NO_PAGADO' || ticket.estado_pago === 'PERDIDO' || ticket.estado_pago === 'Perdido_Sistema') {
+    if (ticket.estado_pago === 'PAGADO' || ticket.estado_pago === 'EXENTO') {
+      ticket.activo = false;
+      ticket.fecha_salida = ahora;
+      await ticket.save();
+
       return res.json({
-        autorizado: false,
-        abrir_barrera: false,
-        mensaje: 'Salida denegada. Ticket pendiente de pago, perdido o vencido por el sistema.',
+        autorizado: true,
+        abrir_barrera: true,
+        mensaje: 'Excelente, muy bien',
+        estado: ticket.estado_pago,
       });
     }
 
-    return res.status(400).json({ autorizado: false, mensaje: 'Estado de pago inválido' });
+    return res.json({
+      autorizado: false,
+      abrir_barrera: false,
+      mensaje: 'Ticket sin pagar. Tiempo excedido de 5 minutos.',
+      estado: 'NO_PAGADO',
+    });
   } catch (error) {
-    return res.status(500).json({ error: 'Error al validar la salida', detalle: error.message });
+    return res.status(500).json({ autorizado: false, error: 'Error al validar la salida', detalle: error.message });
   }
 });
 
