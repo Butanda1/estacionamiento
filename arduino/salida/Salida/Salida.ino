@@ -11,6 +11,7 @@ Servo barrera;
 
 const int trigPin = 10;
 const int echoPin = 11;
+const int pinBuzzer = 13;
 long duracion;
 int distancia;
 
@@ -34,6 +35,11 @@ void setup() {
   barrera.attach(12);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
+
+  //buzzer
+  pinMode(pinBuzzer, OUTPUT);
+  digitalWrite(pinBuzzer, LOW);
+
   barrera.write(0);
   
   espSerial.begin(9600);
@@ -68,8 +74,14 @@ void loop() {
     }
   } else { 
     char tecla_presionada = teclado.getKey();
+
     
     if (tecla_presionada) {
+
+      digitalWrite(pinBuzzer, HIGH);
+      delay(50);
+      digitalWrite(pinBuzzer, LOW);
+
       if (tecla_presionada == 'C') {
         textKey = ""; 
         actualizarPantalla();
@@ -82,7 +94,7 @@ void loop() {
       }
       else if (tecla_presionada == '*') {
         if (textKey.length() > 0) {
-          validarEnServidor(); // Llamamos a la función mágica
+          validarEnServidor(); // llamar la funcion del server
         }
       }
       else if (tecla_presionada != 'A') {
@@ -141,15 +153,29 @@ void validarEnServidor() {
       } else {
         lcd.print(respuesta);
       }
+
+      // --- SONIDO DE ERROR (Un pitido largo) ---
+      digitalWrite(pinBuzzer, HIGH);
+      delay(1200);
+      digitalWrite(pinBuzzer, LOW);
+      // -----------------------------------------
       
-      delay(3000);
-      textKey = ""; // Borramos el ticket para que intente de nuevo
+      delay(1800); // El resto de la espera
+      textKey = ""; 
       actualizarPantalla();
     }
   } else {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Error de Red");
+
+    for(int i=0; i<3; i++){
+      digitalWrite(pinBuzzer, HIGH);
+      delay(200);
+      digitalWrite(pinBuzzer, LOW);
+      delay(200);
+    }
+
     delay(3000);
     textKey = "";
     actualizarPantalla();
@@ -157,6 +183,14 @@ void validarEnServidor() {
 }
 
 void openGate() {
+  digitalWrite(pinBuzzer, HIGH);
+  delay(100);
+  digitalWrite(pinBuzzer, LOW);
+  delay(100);
+  digitalWrite(pinBuzzer, HIGH);
+  delay(100);
+  digitalWrite(pinBuzzer, LOW);
+
   barrera.write(90);
   lcd.clear();
   lcd.setCursor(0, 0);
