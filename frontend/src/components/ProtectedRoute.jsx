@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children }) {
   const { estaAutenticado } = useAuth();
 
   if (!estaAutenticado) {
-    return React.createElement(Navigate, { to: '/login', replace: true });
+    return React.createElement(Navigate, { to: '/', replace: true });
   }
 
   return React.createElement(
