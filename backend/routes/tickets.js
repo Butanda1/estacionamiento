@@ -172,7 +172,7 @@ router.get('/historial', verificarToken, async (req, res) => {
 });
 
 // GET /api/tickets/:id
-router.get('/:id', verificarToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     // Asegurar que los tickets vencidos se actualicen antes de buscar
     await checkExpiredTickets();
@@ -264,7 +264,7 @@ router.get('/', verificarToken, async (req, res) => {
 
 // POST /api/tickets/reposicion
 // Generar un nuevo ticket de reposición desde cero sin pedir datos
-router.post('/reposicion', verificarToken, async (req, res) => {
+router.post('/reposicion', async (req, res) => {
   try {
     let codigo;
     let existe = true;

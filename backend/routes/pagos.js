@@ -13,7 +13,7 @@ function calcularMontoAPagar(minutosTranscurridos) {
 }
 
 // POST /api/pagos/simular-pago
-router.post('/simular-pago', verificarToken, async (req, res) => {
+router.post('/simular-pago', async (req, res) => {
   try {
     const { ticket_id, id_ticket, _id } = req.body;
     const codigoInput = (ticket_id || id_ticket || _id || '').trim().toUpperCase();
@@ -108,7 +108,7 @@ router.post('/simular-pago', verificarToken, async (req, res) => {
 });
 
 // POST /api/pagos/reportar-perdido
-router.post('/reportar-perdido', verificarToken, async (req, res) => {
+router.post('/reportar-perdido', async (req, res) => {
   try {
     const { ticket_id_original, id_ticket_original, ticket_id, _id } = req.body;
     const codigoInput = (ticket_id_original || id_ticket_original || ticket_id || _id || '').trim().toUpperCase();

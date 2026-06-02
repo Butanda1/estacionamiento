@@ -69,9 +69,21 @@ export default function PublicPayment() {
       const res = await fetch(`/api/tickets/${idTicket.trim().toUpperCase()}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Ticket no encontrado'); return; }
-      const ahora = new Date();
-      const minutos = Math.round((ahora - new Date(data.fecha_entrada)) / 60000);
+      
+      let tiempoFinal = new Date();
+      if (data.fecha_salida) {
+        tiempoFinal = new Date(data.fecha_salida);
+      } else if (data.estado_pago === 'PAGADO' || data.estado_pago === 'EXENTO') {
+        tiempoFinal = (data.pagos_info && data.pagos_info.length > 0) ? new Date(data.pagos_info[data.pagos_info.length - 1].fecha_pago) : new Date(data.updatedAt);
+      }
+      
+      const minutos = Math.max(0, Math.round((tiempoFinal - new Date(data.fecha_entrada)) / 60000));
       let monto = data.tipo === 'Reposicion' ? 100 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 15);
+      
+      // Si ya estaba pagado, respetamos el monto que se pagó realmente
+      if (data.estado_pago === 'PAGADO') monto = data.monto_pagado || monto;
+      if (data.estado_pago === 'EXENTO') monto = 0;
+      
       setResultado({ ticket: data, minutosTranscurridos: minutos, montoCalculado: monto, esGratuito: monto === 0 && data.tipo !== 'Reposicion' });
     } catch { setError('Error de conexión con el servidor'); }
     finally { setCargando(false); }
@@ -216,15 +228,25 @@ export default function PublicPayment() {
               {resultado && !resultado.perdido && (
                 <div className="bg-gray-800/40 rounded-xl p-6 space-y-6 border border-gray-700/50 backdrop-blur-md">
                   <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" />Información del Ticket</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                     <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
                     <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
+                      <span className="text-gray-200 font-semibold">
+                        {(() => {
+                          const horas = Math.floor(resultado.minutosTranscurridos / 60);
+                          const mins = resultado.minutosTranscurridos % 60;
+                          return horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+                        })()}
+                      </span>
+                    </div>
                     <div><span className="text-gray-500 block mb-1">Estado:</span>
                       {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
                         ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
                         : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">{resultado.ticket.estado_pago || 'PENDIENTE'}</span>}
                     </div>
-                    <div><span className="text-gray-500 block mb-1">Monto a Pagar:</span><span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>{resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}</span></div>
+                    <div className="sm:col-span-2 md:col-span-2"><span className="text-gray-500 block mb-1">Monto a Pagar:</span><span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>{resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}</span></div>
                   </div>
                   {(resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE') && !resultado.pagado && (
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-700/50">

@@ -127,13 +127,27 @@ export default function HistoryTable() {
                       <th className="px-6 py-4 font-semibold">Tipo</th>
                       <th className="px-6 py-4 font-semibold">Entrada</th>
                       <th className="px-6 py-4 font-semibold">Salida</th>
+                      <th className="px-6 py-4 font-semibold">Tiempo</th>
                       <th className="px-6 py-4 font-semibold">Estado</th>
                       <th className="px-6 py-4 font-semibold">Monto</th>
                       <th className="px-6 py-4 font-semibold">Perdido</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700/50">
-                    {ticketsFiltrados.map((ticket) => (
+                    {ticketsFiltrados.map((ticket) => {
+                      const entrada = new Date(ticket.fecha_entrada);
+                      let tiempoFinal = new Date();
+                      if (ticket.fecha_salida) {
+                        tiempoFinal = new Date(ticket.fecha_salida);
+                      } else if (ticket.estado_pago === 'PAGADO' || ticket.estado_pago === 'EXENTO') {
+                        tiempoFinal = (ticket.pagos_info && ticket.pagos_info.length > 0) ? new Date(ticket.pagos_info[ticket.pagos_info.length - 1].fecha_pago) : new Date(ticket.updatedAt);
+                      }
+                      const minsTotales = Math.max(0, Math.round((tiempoFinal - entrada) / 60000));
+                      const horas = Math.floor(minsTotales / 60);
+                      const mins = minsTotales % 60;
+                      const tiempo = horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+
+                      return (
                       <tr key={ticket._id} className="hover:bg-blue-900/20 transition-colors duration-200 text-gray-300">
                         <td className="px-6 py-4 font-mono font-semibold text-blue-400">
                           {ticket.id_ticket}
@@ -154,6 +168,9 @@ export default function HistoryTable() {
                           {ticket.fecha_salida
                             ? new Date(ticket.fecha_salida).toLocaleString('es-MX')
                             : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-gray-300 font-medium">
+                          {tiempo}
                         </td>
                         <td className="px-6 py-4">
                           {ticket.estado_pago === 'PAGADO' && (
@@ -202,7 +219,8 @@ export default function HistoryTable() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
