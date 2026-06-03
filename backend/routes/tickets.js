@@ -3,6 +3,7 @@ const Ticket = require('../models/Ticket');
 const verificarToken = require('../middleware/auth');
 const { checkExpiredTickets } = require('../utils/expiryScheduler');
 const { generarCodigo } = require('../utils/codigoGenerator');
+const { emitTicketCreated, emitTicketUpdated } = require('../socket/socketEvents');
 
 const router = express.Router();
 
@@ -27,6 +28,8 @@ router.post('/entrada', async (req, res) => {
       estado_pago: 'NO_PAGADO',
       activo: true,
     });
+
+    emitTicketCreated(nuevoTicket);
 
     return res.status(201).json({
       _id: nuevoTicket._id,
@@ -80,6 +83,8 @@ router.post('/validar-salida', async (req, res) => {
       ticket.fecha_salida = ahora;
       await ticket.save();
 
+      emitTicketUpdated(ticket);
+
       return res.json({
         autorizado: true,
         abrir_barrera: true,
@@ -93,6 +98,8 @@ router.post('/validar-salida', async (req, res) => {
       ticket.activo = false;
       ticket.fecha_salida = ahora;
       await ticket.save();
+
+      emitTicketUpdated(ticket);
 
       return res.json({
         autorizado: true,
@@ -172,7 +179,7 @@ router.get('/historial', verificarToken, async (req, res) => {
 });
 
 // GET /api/tickets/:id
-router.get('/:id', verificarToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     // Asegurar que los tickets vencidos se actualicen antes de buscar
     await checkExpiredTickets();
@@ -264,7 +271,7 @@ router.get('/', verificarToken, async (req, res) => {
 
 // POST /api/tickets/reposicion
 // Generar un nuevo ticket de reposición desde cero sin pedir datos
-router.post('/reposicion', verificarToken, async (req, res) => {
+router.post('/reposicion', async (req, res) => {
   try {
     let codigo;
     let existe = true;
@@ -284,6 +291,8 @@ router.post('/reposicion', verificarToken, async (req, res) => {
       activo: true,
       tipo: 'Reposicion',
     });
+
+    emitTicketCreated(nuevoTicket);
 
     return res.status(201).json({
       _id: nuevoTicket._id,

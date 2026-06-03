@@ -17,6 +17,7 @@ export default function PaymentSimulator() {
 
   // --- Normal Tab State ---
   const [idTicket, setIdTicket] = useState('');
+  const [codigoDescuento, setCodigoDescuento] = useState('');
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -84,7 +85,10 @@ export default function PaymentSimulator() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ticket_id: idTicket.trim().toUpperCase() }),
+        body: JSON.stringify({
+          ticket_id: idTicket.trim().toUpperCase(),
+          codigo_descuento: codigoDescuento.trim().toUpperCase() || null,
+        }),
       });
 
       const data = await res.json();
@@ -356,10 +360,44 @@ export default function PaymentSimulator() {
                   </div>
                 )}
                 <div>
+                  <span className="text-gray-500 block mb-1">Código de Descuento:</span>
+                  <input
+                    type="text"
+                    value={codigoDescuento}
+                    onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
+                    placeholder="Ingrese código"
+                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all"
+                  />
+                </div>
+                <div>
                   <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
-                  <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`}>
-                    {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}
-                  </span>
+                  {(() => {
+                    let porcentajeDescuento = 0;
+                    if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                    else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+                    
+                    const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 100);
+                    
+                    return (
+                      <div className="space-y-2">
+                        <div>
+                          <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`}>
+                            {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${montoConDescuento.toLocaleString('es-MX')} MXN`}
+                          </span>
+                        </div>
+                        {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                          <div className="text-xs space-y-1">
+                            <div className="text-gray-400">
+                              Monto Original: <span className="text-gray-300 line-through">${resultado.montoCalculado.toLocaleString('es-MX')}</span>
+                            </div>
+                            <div className="text-emerald-400 font-semibold">
+                              Descuento ({porcentajeDescuento}%): -${(resultado.montoCalculado * porcentajeDescuento / 100).toLocaleString('es-MX')}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -384,11 +422,24 @@ export default function PaymentSimulator() {
                 </div>
               )}
 
-              {resultado.pagado && (
-                <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse">
-                  Pago Registrado Exitosamente - ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN
-                </div>
-              )}
+              {(() => {
+                let porcentajeDescuento = 0;
+                if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+                
+                const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 100);
+                
+                return (resultado.pagado || porcentajeDescuento > 0) ? (
+                  <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse space-y-2">
+                    {resultado.pagado && (
+                      <div>Pago Registrado Exitosamente - ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>
+                    )}
+                    {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                      <div>Descuento ({porcentajeDescuento}%) Aplicado - Nuevo Total: ${montoConDescuento.toLocaleString('es-MX')} MXN</div>
+                    )}
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 

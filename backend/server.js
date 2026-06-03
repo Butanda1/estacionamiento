@@ -1,15 +1,21 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const http = require('http');
 const connectDB = require('./config/db');
 const { checkExpiredTickets } = require('./utils/expiryScheduler');
+const { initializeSocket } = require('./socket/socketHandler');
 const path = require('path'); // <-- NUEVO: Para manejar rutas de archivos
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
 connectDB();
+
+// Inicializar WebSocket
+initializeSocket(server);
 
 // Control de tickets vencidos (Pasar a Perdido_Sistema después de 24 horas)
 checkExpiredTickets();
@@ -44,6 +50,6 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
