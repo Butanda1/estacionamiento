@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 import { CurrencyDollarIcon, ClockIcon, LockClosedIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard() {
   const { token } = useAuth();
+  const { socket } = useSocket();
   const [metricas, setMetricas] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -26,9 +28,37 @@ export default function Dashboard() {
     };
 
     fetchMetricas();
-    const interval = setInterval(fetchMetricas, 10000);
+    // Polling de respaldo cada 30s (el WebSocket es el canal principal)
+    const interval = setInterval(fetchMetricas, 30000);
     return () => clearInterval(interval);
   }, [token]);
+
+  // Refrescar métricas inmediatamente ante cualquier evento WebSocket
+  useEffect(() => {
+    if (!socket) return;
+
+    const fetchMetricas = async () => {
+      try {
+        const res = await fetch('/api/dashboard/metricas', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok) setMetricas(data);
+      } catch (_) {}
+    };
+
+    socket.on('ticket:created', fetchMetricas);
+    socket.on('ticket:updated', fetchMetricas);
+    socket.on('pago:created', fetchMetricas);
+    socket.on('ticket:lost', fetchMetricas);
+
+    return () => {
+      socket.off('ticket:created', fetchMetricas);
+      socket.off('ticket:updated', fetchMetricas);
+      socket.off('pago:created', fetchMetricas);
+      socket.off('ticket:lost', fetchMetricas);
+    };
+  }, [socket, token]);
 
   if (cargando) {
     return (

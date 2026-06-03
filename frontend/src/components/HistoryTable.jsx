@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function HistoryTable() {
   const { token } = useAuth();
+  const { socket } = useSocket();
   const [tickets, setTickets] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [wsIndicator, setWsIndicator] = useState(false);
 
   const ticketsFiltrados = tickets.filter((ticket) => {
     return (ticket.id_ticket || '').toLowerCase().includes(busqueda.toLowerCase());
@@ -39,6 +42,31 @@ export default function HistoryTable() {
     fetchTickets();
   }, [fetchTickets]);
 
+  // Escuchar eventos WebSocket para actualizar en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+
+    const flashIndicator = () => {
+      setWsIndicator(true);
+      setTimeout(() => setWsIndicator(false), 1200);
+    };
+
+    const handleUpdate = () => {
+      flashIndicator();
+      fetchTickets();
+    };
+
+    socket.on('ticket:created', handleUpdate);
+    socket.on('ticket:updated', handleUpdate);
+    socket.on('ticket:lost', handleUpdate);
+
+    return () => {
+      socket.off('ticket:created', handleUpdate);
+      socket.off('ticket:updated', handleUpdate);
+      socket.off('ticket:lost', handleUpdate);
+    };
+  }, [socket, fetchTickets]);
+
   const filtros = [
     { valor: 'todos', label: 'Todos' },
     { valor: 'dentro', label: 'Dentro' },
@@ -49,9 +77,25 @@ export default function HistoryTable() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-100 tracking-tight">Historial de <span className="text-blue-500">Tickets</span></h1>
-        <p className="text-gray-400 text-sm mt-1">Consulta todos los registros generados en el sistema</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-100 tracking-tight">Historial de <span className="text-blue-500">Tickets</span></h1>
+          <p className="text-gray-400 text-sm mt-1">Consulta todos los registros generados en el sistema</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <span
+            className={`inline-block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+              wsIndicator
+                ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.9)] scale-125'
+                : socket?.connected
+                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
+                : 'bg-gray-600'
+            }`}
+          />
+          <span className="text-xs text-gray-500">
+            {wsIndicator ? 'Actualizando...' : socket?.connected ? 'En vivo' : 'Desconectado'}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -130,6 +174,7 @@ export default function HistoryTable() {
                       <th className="px-6 py-4 font-semibold">Tiempo</th>
                       <th className="px-6 py-4 font-semibold">Estado</th>
                       <th className="px-6 py-4 font-semibold">Monto</th>
+                      <th className="px-6 py-4 font-semibold">Descuento</th>
                       <th className="px-6 py-4 font-semibold">Perdido</th>
                     </tr>
                   </thead>
@@ -146,6 +191,13 @@ export default function HistoryTable() {
                       const horas = Math.floor(minsTotales / 60);
                       const mins = minsTotales % 60;
                       const tiempo = horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+
+                      // Extraer info de descuento del pago con cupón
+                      const pagoConDescuento = ticket.pagos_info?.find(p => p.codigo_descuento);
+                      const codigoCupon = pagoConDescuento?.codigo_descuento || null;
+                      const porcentajeDesc = pagoConDescuento?.porcentaje_descuento || 0;
+                      const montoDesc = pagoConDescuento?.monto_descuento || 0;
+                      const montoOriginal = montoDesc > 0 ? ticket.monto_pagado + montoDesc : null;
 
                       return (
                       <tr key={ticket._id} className="hover:bg-blue-900/20 transition-colors duration-200 text-gray-300">
@@ -206,6 +258,20 @@ export default function HistoryTable() {
                         </td>
                         <td className="px-6 py-4 font-semibold text-gray-200">
                           ${ticket.monto_pagado.toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-6 py-4">
+                          {codigoCupon ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="bg-violet-900/30 border border-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full text-xs font-semibold shadow-[0_0_10px_rgba(139,92,246,0.2)] text-center tracking-wide">
+                                {codigoCupon}
+                              </span>
+                              <span className="text-[10px] text-center text-violet-400 font-medium">
+                                -{porcentajeDesc}% (−${montoDesc.toLocaleString('es-MX')})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 text-xs">—</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {ticket.ticket_perdido ? (

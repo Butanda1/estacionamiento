@@ -7,6 +7,8 @@ import {
   UserCircleIcon, KeyIcon, ArrowRightEndOnRectangleIcon, XMarkIcon
 } from '@heroicons/react/24/outline';
 
+import icon from './icon.png';
+
 export default function PublicPayment() {
   const { login, estaAutenticado } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +34,7 @@ export default function PublicPayment() {
 
   // Normal tab
   const [idTicket, setIdTicket] = useState('');
+  const [codigoDescuento, setCodigoDescuento] = useState('');
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +97,10 @@ export default function PublicPayment() {
     try {
       const res = await fetch('/api/pagos/simular-pago', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket_id: idTicket.trim().toUpperCase() }),
+        body: JSON.stringify({
+          ticket_id: idTicket.trim().toUpperCase(),
+          codigo_descuento: codigoDescuento.trim().toUpperCase() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error al simular pago'); return; }
@@ -179,7 +185,12 @@ export default function PublicPayment() {
           <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
             <span className="text-gray-100 font-bold text-lg tracking-wider flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse" />
-              ESTACIONAMIENTO <span className="text-blue-500">PRO</span>
+              <img
+                src={icon}
+                alt="BeneParc"
+                className="h-8 w-8 object-contain"
+              />
+              BeneParc <span className="text-blue-500">Pro</span>
             </span>
             <button
               onClick={() => { setShowLogin(true); setLoginError(''); setLoginUser(''); setLoginPass(''); }}
@@ -215,7 +226,7 @@ export default function PublicPayment() {
               <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 backdrop-blur-md">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Ingrese el ID del Ticket</label>
                 <div className="flex gap-3">
-                  <input type="text" value={idTicket} onChange={e => setIdTicket(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarTicket()} placeholder="Ej: A1B2C3D4" className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all" />
+                  <input type="text" value={idTicket} onChange={e => setIdTicket(e.target.value.slice(0, 4))} onKeyDown={e => e.key === 'Enter' && buscarTicket()} placeholder="Ej: 1234" className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all" />
                   <button onClick={buscarTicket} disabled={cargando || !idTicket.trim()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-500 transition-all disabled:opacity-50">
                     {cargando ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <MagnifyingGlassIcon className="h-5 w-5" />}
                     Buscar
@@ -241,12 +252,51 @@ export default function PublicPayment() {
                         })()}
                       </span>
                     </div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Código de Descuento:</span>
+                      <input
+                        type="text"
+                        value={codigoDescuento}
+                        onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
+                        placeholder="Ingrese código"
+                        className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all"
+                      />
+                    </div>
                     <div><span className="text-gray-500 block mb-1">Estado:</span>
                       {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
                         ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
                         : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">{resultado.ticket.estado_pago || 'PENDIENTE'}</span>}
                     </div>
-                    <div className="sm:col-span-2 md:col-span-2"><span className="text-gray-500 block mb-1">Monto a Pagar:</span><span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>{resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}</span></div>
+                    <div className="sm:col-span-2 md:col-span-2">
+                      <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
+                      {(() => {
+                        let porcentajeDescuento = 0;
+                        if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                        else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+                        
+                        const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 100);
+                        
+                        return (
+                          <div className="space-y-2">
+                            <div>
+                              <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                                {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${montoConDescuento.toLocaleString('es-MX')} MXN`}
+                              </span>
+                            </div>
+                            {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                              <div className="text-xs space-y-1">
+                                <div className="text-gray-400">
+                                  Monto Original: <span className="text-gray-300 line-through">${resultado.montoCalculado.toLocaleString('es-MX')}</span>
+                                </div>
+                                <div className="text-emerald-400 font-semibold">
+                                  Descuento ({porcentajeDescuento}%): -${(resultado.montoCalculado * porcentajeDescuento / 100).toLocaleString('es-MX')}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                   {(resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE') && !resultado.pagado && (
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-700/50">
@@ -254,7 +304,24 @@ export default function PublicPayment() {
                       <button onClick={reportarPerdido} disabled={cargando} className="flex-1 flex justify-center items-center gap-2 bg-red-900/50 border border-red-500/80 text-red-200 py-3 rounded-lg font-semibold hover:bg-red-800 transition-all disabled:opacity-50"><ExclamationTriangleIcon className="h-5 w-5" />Reportar Perdido</button>
                     </div>
                   )}
-                  {resultado.pagado && <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse">Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>}
+                  {(() => {
+                    let porcentajeDescuento = 0;
+                    if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                    else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+                    
+                    const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 100);
+                    
+                    return (resultado.pagado || porcentajeDescuento > 0) ? (
+                      <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse space-y-2">
+                        {resultado.pagado && (
+                          <div>Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>
+                        )}
+                        {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                          <div>Descuento ({porcentajeDescuento}%) Aplicado - Nuevo Total: ${montoConDescuento.toLocaleString('es-MX')} MXN</div>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -335,7 +402,7 @@ export default function PublicPayment() {
           <div className="bg-gray-900/95 p-8 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] w-full max-w-md border border-gray-700/50 relative">
             <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-gray-500 hover:text-gray-200 transition-colors"><XMarkIcon className="h-5 w-5" /></button>
             <div className="text-center mb-6">
-              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><UserCircleIcon className="h-10 w-10 text-blue-400" /></div></div>
+              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><img src={icon} alt="BeneParc" className="h-16 w-16 object-contain"/></div></div>
               <h2 className="text-2xl font-bold text-gray-100">Acceso Admin</h2>
               <p className="text-gray-400 text-sm mt-1">Ingresa tus credenciales</p>
             </div>
