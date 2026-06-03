@@ -3,6 +3,7 @@ const Ticket = require('../models/Ticket');
 const Pago = require('../models/Pago');
 const verificarToken = require('../middleware/auth');
 const { generarCodigo } = require('../utils/codigoGenerator');
+const { emitTicketUpdated, emitPagoCreated, emitTicketLost } = require('../socket/socketEvents');
 
 const router = express.Router();
 
@@ -53,6 +54,9 @@ router.post('/simular-pago', async (req, res) => {
         monto: monto,
       });
 
+      emitTicketUpdated(ticket);
+      emitPagoCreated(nuevoPago);
+
       return res.json({
         mensaje: 'Pago de reposición registrado exitosamente',
         ticket: {
@@ -70,6 +74,8 @@ router.post('/simular-pago', async (req, res) => {
       if (minutosTranscurridos <= 5) {
         ticket.estado_pago = 'EXENTO';
         await ticket.save();
+
+        emitTicketUpdated(ticket);
 
         return res.json({
           mensaje: 'Pago simulado como EXENTO (menor o igual a 5 minutos)',
@@ -89,6 +95,9 @@ router.post('/simular-pago', async (req, res) => {
           fecha_pago: ahora,
           monto: monto,
         });
+
+        emitTicketUpdated(ticket);
+        emitPagoCreated(nuevoPago);
 
         return res.json({
           mensaje: 'Pago simulado exitosamente',
@@ -158,6 +167,10 @@ router.post('/reportar-perdido', async (req, res) => {
       estado_pago: 'EXENTO',
       activo: true,
     });
+
+    emitTicketUpdated(ticketOriginal);
+    emitPagoCreated(pagoPenalizacion);
+    emitTicketLost(ticketOriginal, ticketReemplazo);
 
     return res.json({
       mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $100 MXN.',
