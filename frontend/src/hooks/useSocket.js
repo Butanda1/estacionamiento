@@ -6,11 +6,14 @@ export function useSocket() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    // En dev: Vite hace proxy de /socket.io → puerto 5000.
+    // En prod: el frontend y el backend corren en el mismo origen.
     const newSocket = io(window.location.origin, {
+      path: '/socket.io',
       reconnectionDelay: 1000,
       reconnection: true,
       reconnectionAttempts: 10,
-      transports: ['websocket'],
+      // Sin restringir transports: Socket.IO intenta WebSocket y hace fallback a polling
     });
 
     newSocket.on('connect', () => {

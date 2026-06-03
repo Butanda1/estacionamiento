@@ -10,6 +10,12 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
+      // Proxy para Socket.IO (WebSocket)
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        ws: true, // <-- esto es clave: habilita el upgrade WebSocket
+      },
     },
   },
 });

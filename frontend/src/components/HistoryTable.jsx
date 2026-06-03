@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function HistoryTable() {
   const { token } = useAuth();
+  const { socket } = useSocket();
   const [tickets, setTickets] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [wsIndicator, setWsIndicator] = useState(false);
 
   const ticketsFiltrados = tickets.filter((ticket) => {
     return (ticket.id_ticket || '').toLowerCase().includes(busqueda.toLowerCase());
@@ -39,6 +42,31 @@ export default function HistoryTable() {
     fetchTickets();
   }, [fetchTickets]);
 
+  // Escuchar eventos WebSocket para actualizar en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+
+    const flashIndicator = () => {
+      setWsIndicator(true);
+      setTimeout(() => setWsIndicator(false), 1200);
+    };
+
+    const handleUpdate = () => {
+      flashIndicator();
+      fetchTickets();
+    };
+
+    socket.on('ticket:created', handleUpdate);
+    socket.on('ticket:updated', handleUpdate);
+    socket.on('ticket:lost', handleUpdate);
+
+    return () => {
+      socket.off('ticket:created', handleUpdate);
+      socket.off('ticket:updated', handleUpdate);
+      socket.off('ticket:lost', handleUpdate);
+    };
+  }, [socket, fetchTickets]);
+
   const filtros = [
     { valor: 'todos', label: 'Todos' },
     { valor: 'dentro', label: 'Dentro' },
@@ -49,9 +77,25 @@ export default function HistoryTable() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-100 tracking-tight">Historial de <span className="text-blue-500">Tickets</span></h1>
-        <p className="text-gray-400 text-sm mt-1">Consulta todos los registros generados en el sistema</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-100 tracking-tight">Historial de <span className="text-blue-500">Tickets</span></h1>
+          <p className="text-gray-400 text-sm mt-1">Consulta todos los registros generados en el sistema</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <span
+            className={`inline-block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+              wsIndicator
+                ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.9)] scale-125'
+                : socket?.connected
+                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
+                : 'bg-gray-600'
+            }`}
+          />
+          <span className="text-xs text-gray-500">
+            {wsIndicator ? 'Actualizando...' : socket?.connected ? 'En vivo' : 'Desconectado'}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
