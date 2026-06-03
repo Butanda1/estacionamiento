@@ -132,8 +132,8 @@ router.post('/reportar-perdido', async (req, res) => {
     ticketOriginal.activo = false;
     await ticketOriginal.save();
 
-    // Crear pago de penalización ($100)
-    const PENALIZACION_PERDIDA = 100;
+    // Crear pago de penalización ($150)
+    const PENALIZACION_PERDIDA = 150;
     const pagoPenalizacion = await Pago.create({
       ticket_id: ticketOriginal._id,
       fecha_pago: new Date(),
@@ -160,7 +160,7 @@ router.post('/reportar-perdido', async (req, res) => {
     });
 
     return res.json({
-      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $100 MXN.',
+      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $150 MXN.',
       ticket_original: {
         ...ticketOriginal.toObject(),
         id_ticket: ticketOriginal._id,
