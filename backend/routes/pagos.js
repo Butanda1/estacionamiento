@@ -10,7 +10,7 @@ const router = express.Router();
 function calcularMontoAPagar(minutosTranscurridos) {
   if (minutosTranscurridos <= 5) return 0;
   const horas = Math.ceil(minutosTranscurridos / 60);
-  return horas * 15;
+  return horas * 10;
 }
 
 // POST /api/pagos/simular-pago
@@ -60,10 +60,7 @@ router.post('/simular-pago', async (req, res) => {
     const ahora = new Date();
     
     if (ticket.tipo === 'Reposicion') {
-      let monto = 100;
-      montoDescuento = monto * (porcentajeDescuento / 100);
-      monto = monto - montoDescuento;
-
+      const monto = 150;
       ticket.estado_pago = 'PAGADO';
       await ticket.save();
 
@@ -169,8 +166,8 @@ router.post('/reportar-perdido', async (req, res) => {
     ticketOriginal.activo = false;
     await ticketOriginal.save();
 
-    // Crear pago de penalización ($100)
-    const PENALIZACION_PERDIDA = 100;
+    // Crear pago de penalización ($150)
+    const PENALIZACION_PERDIDA = 150;
     const pagoPenalizacion = await Pago.create({
       ticket_id: ticketOriginal._id,
       fecha_pago: new Date(),
@@ -201,7 +198,7 @@ router.post('/reportar-perdido', async (req, res) => {
     emitTicketLost(ticketOriginal, ticketReemplazo);
 
     return res.json({
-      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $100 MXN.',
+      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $150 MXN.',
       ticket_original: {
         ...ticketOriginal.toObject(),
         id_ticket: ticketOriginal._id,
