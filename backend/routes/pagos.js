@@ -60,7 +60,7 @@ router.post('/simular-pago', async (req, res) => {
     const ahora = new Date();
     
     if (ticket.tipo === 'Reposicion') {
-      const monto = 100;
+      const monto = 150;
       ticket.estado_pago = 'PAGADO';
       await ticket.save();
 
