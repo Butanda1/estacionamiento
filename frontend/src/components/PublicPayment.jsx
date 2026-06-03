@@ -215,7 +215,7 @@ export default function PublicPayment() {
               <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 backdrop-blur-md">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Ingrese el ID del Ticket</label>
                 <div className="flex gap-3">
-                  <input type="text" value={idTicket} onChange={e => setIdTicket(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarTicket()} placeholder="Ej: A1B2C3D4" className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all" />
+                  <input type="text" value={idTicket} onChange={e => setIdTicket(e.target.value.slice(0, 4))} onKeyDown={e => e.key === 'Enter' && buscarTicket()} placeholder="Ej: 1234" className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all" />
                   <button onClick={buscarTicket} disabled={cargando || !idTicket.trim()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-500 transition-all disabled:opacity-50">
                     {cargando ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <MagnifyingGlassIcon className="h-5 w-5" />}
                     Buscar
