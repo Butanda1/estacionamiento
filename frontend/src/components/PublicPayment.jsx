@@ -7,6 +7,8 @@ import {
   UserCircleIcon, KeyIcon, ArrowRightEndOnRectangleIcon, XMarkIcon
 } from '@heroicons/react/24/outline';
 
+import icon from './icon.png';
+
 export default function PublicPayment() {
   const { login, estaAutenticado } = useAuth();
   const navigate = useNavigate();
@@ -183,7 +185,12 @@ export default function PublicPayment() {
           <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
             <span className="text-gray-100 font-bold text-lg tracking-wider flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse" />
-              ESTACIONAMIENTO <span className="text-blue-500">PRO</span>
+              <img
+                src={icon}
+                alt="BeneParc"
+                className="h-8 w-8 object-contain"
+              />
+              BeneParc <span className="text-blue-500">Pro</span>
             </span>
             <button
               onClick={() => { setShowLogin(true); setLoginError(''); setLoginUser(''); setLoginPass(''); }}
@@ -395,7 +402,7 @@ export default function PublicPayment() {
           <div className="bg-gray-900/95 p-8 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] w-full max-w-md border border-gray-700/50 relative">
             <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-gray-500 hover:text-gray-200 transition-colors"><XMarkIcon className="h-5 w-5" /></button>
             <div className="text-center mb-6">
-              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><UserCircleIcon className="h-10 w-10 text-blue-400" /></div></div>
+              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><img src={icon} alt="BeneParc" className="h-16 w-16 object-contain"/></div></div>
               <h2 className="text-2xl font-bold text-gray-100">Acceso Admin</h2>
               <p className="text-gray-400 text-sm mt-1">Ingresa tus credenciales</p>
             </div>
