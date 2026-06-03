@@ -130,6 +130,7 @@ export default function HistoryTable() {
                       <th className="px-6 py-4 font-semibold">Tiempo</th>
                       <th className="px-6 py-4 font-semibold">Estado</th>
                       <th className="px-6 py-4 font-semibold">Monto</th>
+                      <th className="px-6 py-4 font-semibold">Descuento</th>
                       <th className="px-6 py-4 font-semibold">Perdido</th>
                     </tr>
                   </thead>
@@ -146,6 +147,13 @@ export default function HistoryTable() {
                       const horas = Math.floor(minsTotales / 60);
                       const mins = minsTotales % 60;
                       const tiempo = horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+
+                      // Extraer info de descuento del pago con cupón
+                      const pagoConDescuento = ticket.pagos_info?.find(p => p.codigo_descuento);
+                      const codigoCupon = pagoConDescuento?.codigo_descuento || null;
+                      const porcentajeDesc = pagoConDescuento?.porcentaje_descuento || 0;
+                      const montoDesc = pagoConDescuento?.monto_descuento || 0;
+                      const montoOriginal = montoDesc > 0 ? ticket.monto_pagado + montoDesc : null;
 
                       return (
                       <tr key={ticket._id} className="hover:bg-blue-900/20 transition-colors duration-200 text-gray-300">
@@ -206,6 +214,20 @@ export default function HistoryTable() {
                         </td>
                         <td className="px-6 py-4 font-semibold text-gray-200">
                           ${ticket.monto_pagado.toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-6 py-4">
+                          {codigoCupon ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="bg-violet-900/30 border border-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full text-xs font-semibold shadow-[0_0_10px_rgba(139,92,246,0.2)] text-center tracking-wide">
+                                {codigoCupon}
+                              </span>
+                              <span className="text-[10px] text-center text-violet-400 font-medium">
+                                -{porcentajeDesc}% (−${montoDesc.toLocaleString('es-MX')})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 text-xs">—</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {ticket.ticket_perdido ? (

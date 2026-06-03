@@ -16,7 +16,7 @@ function calcularMontoAPagar(minutosTranscurridos) {
 // POST /api/pagos/simular-pago
 router.post('/simular-pago', async (req, res) => {
   try {
-    const { ticket_id, id_ticket, _id } = req.body;
+    const { ticket_id, id_ticket, _id, codigo_descuento } = req.body;
     const codigoInput = (ticket_id || id_ticket || _id || '').trim().toUpperCase();
 
     if (!codigoInput) {
@@ -41,10 +41,29 @@ router.post('/simular-pago', async (req, res) => {
       return res.status(400).json({ error: 'Este ticket ya no está activo' });
     }
 
+    // Procesar descuento
+    let porcentajeDescuento = 0;
+    let montoDescuento = 0;
+    let codigoDescuentoAplicado = null;
+
+    if (codigo_descuento) {
+      const descuento = codigo_descuento.trim().toUpperCase();
+      if (descuento === '50OFF') {
+        porcentajeDescuento = 50;
+        codigoDescuentoAplicado = '50OFF';
+      } else if (descuento === '25OFF') {
+        porcentajeDescuento = 25;
+        codigoDescuentoAplicado = '25OFF';
+      }
+    }
+
     const ahora = new Date();
     
     if (ticket.tipo === 'Reposicion') {
-      const monto = 100;
+      let monto = 100;
+      montoDescuento = monto * (porcentajeDescuento / 100);
+      monto = monto - montoDescuento;
+
       ticket.estado_pago = 'PAGADO';
       await ticket.save();
 
@@ -52,6 +71,9 @@ router.post('/simular-pago', async (req, res) => {
         ticket_id: ticket._id,
         fecha_pago: ahora,
         monto: monto,
+        codigo_descuento: codigoDescuentoAplicado,
+        porcentaje_descuento: porcentajeDescuento,
+        monto_descuento: montoDescuento,
       });
 
       emitTicketUpdated(ticket);
@@ -69,7 +91,7 @@ router.post('/simular-pago', async (req, res) => {
       });
     } else {
       const minutosTranscurridos = Math.round((ahora - ticket.fecha_entrada) / 60000);
-      const monto = calcularMontoAPagar(minutosTranscurridos);
+      let monto = calcularMontoAPagar(minutosTranscurridos);
 
       if (minutosTranscurridos <= 5) {
         ticket.estado_pago = 'EXENTO';
@@ -87,6 +109,9 @@ router.post('/simular-pago', async (req, res) => {
           monto_pagado: 0,
         });
       } else {
+        montoDescuento = monto * (porcentajeDescuento / 100);
+        monto = monto - montoDescuento;
+
         ticket.estado_pago = 'PAGADO';
         await ticket.save();
 
@@ -94,6 +119,9 @@ router.post('/simular-pago', async (req, res) => {
           ticket_id: ticket._id,
           fecha_pago: ahora,
           monto: monto,
+          codigo_descuento: codigoDescuentoAplicado,
+          porcentaje_descuento: porcentajeDescuento,
+          monto_descuento: montoDescuento,
         });
 
         emitTicketUpdated(ticket);
