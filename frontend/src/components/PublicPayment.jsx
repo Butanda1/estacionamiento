@@ -295,7 +295,7 @@ export default function PublicPayment() {
                     </div>
                     <div>
                       <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
-                      <span className={`text-2xm font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                      <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
                         {(() => {
                           const horas = Math.floor(resultado.minutosTranscurridos / 60);
                           const mins = resultado.minutosTranscurridos % 60;
