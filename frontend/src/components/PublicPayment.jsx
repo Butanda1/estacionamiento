@@ -119,7 +119,7 @@ export default function PublicPayment() {
       setResultado(null);
       setIdTicket('');
       setCodigoDescuento('');
-    }, 2000);
+    },);
   };
 
   const reportarPerdido = async () => {
@@ -312,8 +312,6 @@ export default function PublicPayment() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                     <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
                     <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
-                    <div className="hidden md:block"></div>
-                    <div className="hidden md:block"></div>
                     <div>
                       <span className="text-gray-500 block mb-1">Código de Descuento:</span>
                       <input
@@ -325,7 +323,6 @@ export default function PublicPayment() {
                         className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
                       />
                     </div>
-                    <div className="hidden md:block"></div>
                     <div>
                       <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
                       {(() => {
