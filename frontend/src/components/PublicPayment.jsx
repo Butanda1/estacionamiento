@@ -274,16 +274,8 @@ export default function PublicPayment() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                     <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
                     <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
-                    <div>
-                      <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
-                      <span className="text-gray-200 font-semibold">
-                        {(() => {
-                          const horas = Math.floor(resultado.minutosTranscurridos / 60);
-                          const mins = resultado.minutosTranscurridos % 60;
-                          return horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
-                        })()}
-                      </span>
-                    </div>
+                    <div className="hidden md:block"></div>
+                    <div className="hidden md:block"></div>
                     <div>
                       <span className="text-gray-500 block mb-1">Código de Descuento:</span>
                       <input
@@ -294,12 +286,8 @@ export default function PublicPayment() {
                         className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all"
                       />
                     </div>
-                    <div><span className="text-gray-500 block mb-1">Estado:</span>
-                      {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
-                        ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
-                        : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">{resultado.ticket.estado_pago || 'PENDIENTE'}</span>}
-                    </div>
-                    <div className="sm:col-span-2 md:col-span-2">
+                    <div className="hidden md:block"></div>
+                    <div>
                       <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
                       {(() => {
                         let porcentajeDescuento = 0;
@@ -328,6 +316,23 @@ export default function PublicPayment() {
                           </div>
                         );
                       })()}
+                    </div>
+                    <div><span className="text-gray-500 block mb-1">Estado:</span>
+                      {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
+                        ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
+                        : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">
+                          {(resultado.ticket.estado_pago || 'PENDIENTE').replaceAll('_', ' ')}
+                          </span>}
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
+                      <span className={`text-xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                        {(() => {
+                          const horas = Math.floor(resultado.minutosTranscurridos / 60);
+                          const mins = resultado.minutosTranscurridos % 60;
+                          return horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+                        })()}
+                      </span>
                     </div>
                   </div>
                   {(resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE') && !resultado.pagado && (
