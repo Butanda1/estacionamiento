@@ -105,8 +105,21 @@ export default function PublicPayment() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error al simular pago'); return; }
       setResultado(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado }));
+      setTimeout(() => {
+        setResultado(null);
+        setIdTicket('');
+        setCodigoDescuento('');
+      }, 4000);
     } catch { setError('Error de conexión'); }
     finally { setCargando(false); }
+  };
+
+  const quitarTicket = () => {
+    setTimeout(() => {
+      setResultado(null);
+      setIdTicket('');
+      setCodigoDescuento('');
+    }, 3000);
   };
 
   const reportarPerdido = async () => {
@@ -159,8 +172,21 @@ export default function PublicPayment() {
       const data = await res.json();
       if (!res.ok) { setErrorReposicion(data.error || 'Error al cobrar'); return; }
       setResultadoReposicion(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado }));
+      setTimeout(() => {
+        setResultadoReposicion(null);
+        setCodigoReposicion('');
+        setTicketReposicion(null);
+      }, 4000);
     } catch { setErrorReposicion('Error de conexión'); }
     finally { setCargandoReposicion(false); }
+  };
+
+  const quitarTicketReposicion = () => {
+    setTimeout(() => {
+      setResultadoReposicion(null);
+      setCodigoReposicion('');
+      setTicketReposicion(null);
+    }, 3000);
   };
 
   const copiarAlPortapapeles = (texto) => {
@@ -270,7 +296,19 @@ export default function PublicPayment() {
 
               {resultado && !resultado.perdido && (
                 <div className="bg-gray-800/40 rounded-xl p-6 space-y-6 border border-gray-700/50 backdrop-blur-md">
-                  <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" />Información del Ticket</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      Información del Ticket
+                    </h3>
+                    <button
+                      onClick={quitarTicket}
+                      className="px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600 border border-gray-600 text-gray-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                      Quitar
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                     <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
                     <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
@@ -283,7 +321,8 @@ export default function PublicPayment() {
                         value={codigoDescuento}
                         onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
                         placeholder="Ingrese código"
-                        className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all"
+                        disabled={codigoDescuento === '50OFF' || codigoDescuento === '25OFF'}
+                        className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
                       />
                     </div>
                     <div className="hidden md:block"></div>
@@ -440,8 +479,15 @@ export default function PublicPayment() {
                       </div>
                     </div>
                     {errorReposicion && <div className="bg-red-900/40 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg text-xs">{errorReposicion}</div>}
-                    {resultadoReposicion && (
-                      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-3">
+                     {resultadoReposicion && (
+                      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-3 relative">
+                        <button
+                          onClick={quitarTicketReposicion}
+                          className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-400 transition-colors"
+                          title="Quitar"
+                        >
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div><span className="text-gray-500 block">Ticket ID:</span><span className="font-mono font-semibold text-blue-400">{resultadoReposicion.ticket.id_ticket}</span></div>
                           <div><span className="text-gray-500 block">Estado:</span><span className={`font-semibold ${resultadoReposicion.ticket.estado_pago === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}`}>{resultadoReposicion.ticket.estado_pago}</span></div>
