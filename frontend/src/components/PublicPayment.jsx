@@ -189,6 +189,16 @@ export default function PublicPayment() {
     }, 3000);
   };
 
+  const limpiarModuloReposicion = () => {
+  // Limpia el recuadro de emisión
+  setTicketReposicion(null);
+  
+  // Limpia el recuadro de cobro
+  setCodigoReposicion('');
+  setResultadoReposicion(null);
+  setErrorReposicion('');
+  };
+
   const copiarAlPortapapeles = (texto) => {
     navigator.clipboard.writeText(texto);
     setCopiado(true);
@@ -246,6 +256,20 @@ export default function PublicPayment() {
               Módulo de Reposición (Tickets Perdidos)
             </button>
           </div>
+
+          {/* NUEVO: Botón Global para Limpiar el Módulo de Reposición */}
+          {activeTab === 'reposicion' && (
+            <div className="flex justify-end mb-4">
+              <button 
+                onClick={limpiarModuloReposicion}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800/40 hover:bg-red-900/20 border border-gray-700/50 hover:border-red-500/50 text-gray-400 hover:text-red-400 rounded-lg text-sm font-medium transition-all shadow-sm"
+                title="Limpiar toda la información de reposiciones"
+              >
+                <XMarkIcon className="h-4 w-4" />
+                Limpiar Todo
+              </button>
+            </div>
+          )}
 
           {activeTab === 'normal' ? (
             <div className="space-y-6">
@@ -305,8 +329,7 @@ export default function PublicPayment() {
                       onClick={quitarTicket}
                       className="px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600 border border-gray-600 text-gray-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
                     >
-                      <XMarkIcon className="h-4 w-4" />
-                      Quitar
+                      <XMarkIcon className="h-5 w-5" />
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
@@ -477,14 +500,7 @@ export default function PublicPayment() {
                     </div>
                     {errorReposicion && <div className="bg-red-900/40 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg text-xs">{errorReposicion}</div>}
                     {resultadoReposicion && (
-                      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-3 relative">
-                        <button
-                          onClick={quitarTicketReposicion}
-                          className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-400 transition-colors"
-                          title="Quitar"
-                        >
-                          <XMarkIcon className="h-4 w-4" />
-                        </button>
+                      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-3">
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div><span className="text-gray-500 block">Ticket ID:</span><span className="font-mono font-semibold text-blue-400">{resultadoReposicion.ticket.id_ticket}</span></div>
                           <div><span className="text-gray-500 block">Estado:</span><span className={`font-semibold ${resultadoReposicion.ticket.estado_pago === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}`}>{resultadoReposicion.ticket.estado_pago}</span></div>
