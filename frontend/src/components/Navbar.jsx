@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import icon from './icon.png';
 
 export default function Navbar() {
   const { usuario, logout } = useAuth();
@@ -26,7 +27,12 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <span className="text-gray-100 font-bold text-lg tracking-wider flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse"></span>
-              ESTACIONAMIENTO <span className="text-blue-500">PRO</span>
+              <img
+                src={icon}
+                alt="BeneParc"
+                className="h-8 w-8 object-contain"
+              />
+              BeneParc <span className="text-blue-500">Pro</span>
             </span>
             <div className="hidden md:flex space-x-2 ml-8">
               <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>

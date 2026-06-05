@@ -7,6 +7,8 @@ import {
   UserCircleIcon, KeyIcon, ArrowRightEndOnRectangleIcon, XMarkIcon
 } from '@heroicons/react/24/outline';
 
+import icon from './icon.png';
+
 export default function PublicPayment() {
   const { login, estaAutenticado } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +34,7 @@ export default function PublicPayment() {
 
   // Normal tab
   const [idTicket, setIdTicket] = useState('');
+  const [codigoDescuento, setCodigoDescuento] = useState('');
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -69,21 +72,21 @@ export default function PublicPayment() {
       const res = await fetch(`/api/tickets/${idTicket.trim().toUpperCase()}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Ticket no encontrado'); return; }
-      
+
       let tiempoFinal = new Date();
       if (data.fecha_salida) {
         tiempoFinal = new Date(data.fecha_salida);
       } else if (data.estado_pago === 'PAGADO' || data.estado_pago === 'EXENTO') {
         tiempoFinal = (data.pagos_info && data.pagos_info.length > 0) ? new Date(data.pagos_info[data.pagos_info.length - 1].fecha_pago) : new Date(data.updatedAt);
       }
-      
+
       const minutos = Math.max(0, Math.round((tiempoFinal - new Date(data.fecha_entrada)) / 60000));
-      let monto = data.tipo === 'Reposicion' ? 100 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 15);
-      
+      let monto = data.tipo === 'Reposicion' ? 150 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 15);
+
       // Si ya estaba pagado, respetamos el monto que se pagó realmente
       if (data.estado_pago === 'PAGADO') monto = data.monto_pagado || monto;
       if (data.estado_pago === 'EXENTO') monto = 0;
-      
+
       setResultado({ ticket: data, minutosTranscurridos: minutos, montoCalculado: monto, esGratuito: monto === 0 && data.tipo !== 'Reposicion' });
     } catch { setError('Error de conexión con el servidor'); }
     finally { setCargando(false); }
@@ -94,13 +97,29 @@ export default function PublicPayment() {
     try {
       const res = await fetch('/api/pagos/simular-pago', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket_id: idTicket.trim().toUpperCase() }),
+        body: JSON.stringify({
+          ticket_id: idTicket.trim().toUpperCase(),
+          codigo_descuento: codigoDescuento.trim().toUpperCase() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error al simular pago'); return; }
       setResultado(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado }));
+      setTimeout(() => {
+        setResultado(null);
+        setIdTicket('');
+        setCodigoDescuento('');
+      }, 2000);
     } catch { setError('Error de conexión'); }
     finally { setCargando(false); }
+  };
+
+  const quitarTicket = () => {
+    setTimeout(() => {
+      setResultado(null);
+      setIdTicket('');
+      setCodigoDescuento('');
+    },);
   };
 
   const reportarPerdido = async () => {
@@ -137,7 +156,7 @@ export default function PublicPayment() {
       const data = await res.json();
       if (!res.ok) { setErrorReposicion(data.error || 'No encontrado'); return; }
       if (data.tipo !== 'Reposicion') { setErrorReposicion('No es un ticket de Reposición.'); return; }
-      setResultadoReposicion({ ticket: data, montoCalculado: 100 });
+      setResultadoReposicion({ ticket: data, montoCalculado: 150 });
     } catch { setErrorReposicion('Error de conexión'); }
     finally { setCargandoReposicion(false); }
   };
@@ -153,8 +172,31 @@ export default function PublicPayment() {
       const data = await res.json();
       if (!res.ok) { setErrorReposicion(data.error || 'Error al cobrar'); return; }
       setResultadoReposicion(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado }));
+      setTimeout(() => {
+        setResultadoReposicion(null);
+        setCodigoReposicion('');
+        setTicketReposicion(null);
+      }, 4000);
     } catch { setErrorReposicion('Error de conexión'); }
     finally { setCargandoReposicion(false); }
+  };
+
+  const quitarTicketReposicion = () => {
+    setTimeout(() => {
+      setResultadoReposicion(null);
+      setCodigoReposicion('');
+      setTicketReposicion(null);
+    }, 3000);
+  };
+
+  const limpiarModuloReposicion = () => {
+  // Limpia el recuadro de emisión
+  setTicketReposicion(null);
+  
+  // Limpia el recuadro de cobro
+  setCodigoReposicion('');
+  setResultadoReposicion(null);
+  setErrorReposicion('');
   };
 
   const copiarAlPortapapeles = (texto) => {
@@ -179,7 +221,12 @@ export default function PublicPayment() {
           <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
             <span className="text-gray-100 font-bold text-lg tracking-wider flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse" />
-              ESTACIONAMIENTO <span className="text-blue-500">PRO</span>
+              <img
+                src={icon}
+                alt="BeneParc"
+                className="h-8 w-8 object-contain"
+              />
+              BeneParc <span className="text-blue-500">Pro</span>
             </span>
             <button
               onClick={() => { setShowLogin(true); setLoginError(''); setLoginUser(''); setLoginPass(''); }}
@@ -210,12 +257,58 @@ export default function PublicPayment() {
             </button>
           </div>
 
+          {/* NUEVO: Botón Global para Limpiar el Módulo de Reposición */}
+          {activeTab === 'reposicion' && (
+            <div className="flex justify-end mb-4">
+              <button 
+                onClick={limpiarModuloReposicion}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800/40 hover:bg-red-900/20 border border-gray-700/50 hover:border-red-500/50 text-gray-400 hover:text-red-400 rounded-lg text-sm font-medium transition-all shadow-sm"
+                title="Limpiar toda la información de reposiciones"
+              >
+                <XMarkIcon className="h-4 w-4" />
+                Limpiar Todo
+              </button>
+            </div>
+          )}
+
           {activeTab === 'normal' ? (
             <div className="space-y-6">
               <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 backdrop-blur-md">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Ingrese el ID del Ticket</label>
                 <div className="flex gap-3">
-                  <input type="text" value={idTicket} onChange={e => setIdTicket(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarTicket()} placeholder="Ej: A1B2C3D4" className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all" />
+                  {/* Contenedor relativo para posicionar la tachita dentro del input */}
+                  <div className="flex-1 relative flex items-center">
+                    <input
+                      type="text"
+                      value={idTicket}
+                      onChange={e => {
+                        setIdTicket(e.target.value.slice(0, 4));
+                        // Al escribir o borrar un número, ocultamos la información y errores
+                        setResultado(null);
+                        setError('');
+                      }}
+                      onKeyDown={e => e.key === 'Enter' && buscarTicket()}
+                      placeholder="Ej: 1234"
+                      className="w-full pl-4 pr-10 py-3 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white placeholder-gray-500 transition-all"
+                    />
+
+                    {/* Renderizado condicional de la tachita */}
+                    {idTicket && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdTicket('');     // Borra el texto del buscador
+                          setResultado(null);  // Oculta la información de abajo
+                          setError('');        // Limpia cualquier error previo
+                        }}
+                        className="absolute right-3 p-1 text-gray-400 hover:text-white rounded-full hover:bg-gray-700/50 transition-colors"
+                        title="Limpiar búsqueda"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
                   <button onClick={buscarTicket} disabled={cargando || !idTicket.trim()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-500 transition-all disabled:opacity-50">
                     {cargando ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <MagnifyingGlassIcon className="h-5 w-5" />}
                     Buscar
@@ -227,13 +320,72 @@ export default function PublicPayment() {
 
               {resultado && !resultado.perdido && (
                 <div className="bg-gray-800/40 rounded-xl p-6 space-y-6 border border-gray-700/50 backdrop-blur-md">
-                  <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" />Información del Ticket</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      Información del Ticket
+                    </h3>
+                    <button
+                      onClick={quitarTicket}
+                      className="px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600 border border-gray-600 text-gray-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                     <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
                     <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
                     <div>
+                      <span className="text-gray-500 block mb-1">Código de Descuento:</span>
+                      <input
+                        type="text"
+                        value={codigoDescuento}
+                        onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
+                        placeholder="Ingrese código"
+                        disabled={codigoDescuento === '50OFF' || codigoDescuento === '25OFF'}
+                        className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
+                      {(() => {
+                        let porcentajeDescuento = 0;
+                        if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                        else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+
+                        const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 150);
+
+                        return (
+                          <div className="space-y-2">
+                            <div>
+                              <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                                {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${montoConDescuento.toLocaleString('es-MX')} MXN`}
+                              </span>
+                            </div>
+                            {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                              <div className="text-xs space-y-1">
+                                <div className="text-gray-400">
+                                  Monto Original: <span className="text-gray-300 line-through">${resultado.montoCalculado.toLocaleString('es-MX')}</span>
+                                </div>
+                                <div className="text-emerald-400 font-semibold">
+                                  Descuento ({porcentajeDescuento}%): -${(resultado.montoCalculado * porcentajeDescuento / 150).toLocaleString('es-MX')}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div><span className="text-gray-500 block mb-1">Estado:</span>
+                      {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
+                        ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
+                        : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">
+                          {(resultado.ticket.estado_pago || 'PENDIENTE').replaceAll('_', ' ')}
+                        </span>}
+                    </div>
+                    <div>
                       <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
-                      <span className="text-gray-200 font-semibold">
+                      <span className={`text-xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
                         {(() => {
                           const horas = Math.floor(resultado.minutosTranscurridos / 60);
                           const mins = resultado.minutosTranscurridos % 60;
@@ -241,12 +393,6 @@ export default function PublicPayment() {
                         })()}
                       </span>
                     </div>
-                    <div><span className="text-gray-500 block mb-1">Estado:</span>
-                      {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
-                        ? <span className="text-emerald-400 font-semibold px-2 py-1 bg-emerald-900/30 border border-emerald-500/30 rounded">{resultado.ticket.estado_pago}</span>
-                        : <span className="text-amber-400 font-semibold px-2 py-1 bg-amber-900/30 border border-amber-500/30 rounded">{resultado.ticket.estado_pago || 'PENDIENTE'}</span>}
-                    </div>
-                    <div className="sm:col-span-2 md:col-span-2"><span className="text-gray-500 block mb-1">Monto a Pagar:</span><span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>{resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}</span></div>
                   </div>
                   {(resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE') && !resultado.pagado && (
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-700/50">
@@ -254,7 +400,24 @@ export default function PublicPayment() {
                       <button onClick={reportarPerdido} disabled={cargando} className="flex-1 flex justify-center items-center gap-2 bg-red-900/50 border border-red-500/80 text-red-200 py-3 rounded-lg font-semibold hover:bg-red-800 transition-all disabled:opacity-50"><ExclamationTriangleIcon className="h-5 w-5" />Reportar Perdido</button>
                     </div>
                   )}
-                  {resultado.pagado && <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse">Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>}
+                  {(() => {
+                    let porcentajeDescuento = 0;
+                    if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
+                    else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
+
+                    const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 150);
+
+                    return (resultado.pagado || porcentajeDescuento > 0) ? (
+                      <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse space-y-2">
+                        {resultado.pagado && (
+                          <div>Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>
+                        )}
+                        {porcentajeDescuento > 0 && !resultado.esGratuito && (
+                          <div>Descuento ({porcentajeDescuento}%) Aplicado - Nuevo Total: ${montoConDescuento.toLocaleString('es-MX')} MXN</div>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -262,7 +425,7 @@ export default function PublicPayment() {
                 <div className="bg-gray-800/40 rounded-xl p-8 text-center border border-red-900/50 backdrop-blur-md">
                   <ExclamationTriangleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
                   <h3 className="text-2xl font-bold text-gray-100 mb-4">Ticket de Reemplazo Generado</h3>
-                  <p className="text-red-300 font-medium mb-4">Penalización: <span className="font-bold text-red-400">$100 MXN</span></p>
+                  <p className="text-red-300 font-medium mb-4">Penalización: <span className="font-bold text-red-400">$150 MXN</span></p>
                   <p className="text-gray-400 mb-2">Nuevo código para el cliente:</p>
                   <div className="inline-block bg-gray-900/80 border border-blue-500/50 px-8 py-4 rounded-xl"><span className="font-mono text-4xl font-bold text-blue-400 tracking-widest">{resultado.nuevoCodigo}</span></div>
                 </div>
@@ -274,7 +437,7 @@ export default function PublicPayment() {
               <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 backdrop-blur-md flex flex-col justify-between">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2 mb-4"><PlusIcon className="h-5 w-5 text-blue-400" />Emitir Reposición</h3>
-                  <p className="text-gray-400 text-sm mb-6 leading-relaxed">Cuando el cliente extravió su ticket. Se genera uno nuevo de tipo <strong className="text-blue-400">Reposicion</strong> con tarifa de $100 MXN.</p>
+                  <p className="text-gray-400 text-sm mb-6 leading-relaxed">Cuando el cliente extravió su ticket. Se genera uno nuevo de tipo <strong className="text-blue-400">Reposicion</strong> con tarifa de $150 MXN.</p>
                   {ticketReposicion && (
                     <div className="bg-gray-900/60 border border-blue-500/30 rounded-xl p-5 mb-6 relative">
                       <div className="flex justify-between items-start mb-4">
@@ -283,7 +446,7 @@ export default function PublicPayment() {
                       </div>
                       <div className="text-xs border-t border-gray-800 pt-3 space-y-2">
                         <div className="flex justify-between"><span className="text-gray-500">Fecha/Hora:</span><span className="text-gray-300">{new Date(ticketReposicion.fecha_entrada).toLocaleString('es-MX')}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Penalización:</span><span className="text-blue-400 font-bold">$100.00 MXN</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Penalización:</span><span className="text-blue-400 font-bold">$150.00 MXN</span></div>
                       </div>
                       {copiado && <div className="absolute bottom-2 right-2 bg-emerald-600/90 text-white text-[10px] px-2 py-0.5 rounded">¡Copiado!</div>}
                     </div>
@@ -303,7 +466,35 @@ export default function PublicPayment() {
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1">ID del ticket de reposición</label>
                       <div className="flex gap-2">
-                        <input type="text" value={codigoReposicion} onChange={e => setCodigoReposicion(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarTicketReposicion()} placeholder="Ej: A1B2C3D4" className="flex-1 px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none uppercase text-sm text-white" />
+                        <div className="flex-1 relative flex items-center">
+                          <input
+                            type="text"
+                            value={codigoReposicion}
+                            onChange={e => {
+                              setCodigoReposicion(e.target.value.toUpperCase());
+                              // Al escribir o borrar, ocultamos la información y errores
+                              setResultadoReposicion(null);
+                              setErrorReposicion('');
+                            }}
+                            onKeyDown={e => e.key === 'Enter' && buscarTicketReposicion()}
+                            placeholder="Ej: 1234"
+                            className="w-full pl-3 pr-10 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none uppercase text-sm text-white"
+                          />
+
+                          {codigoReposicion && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCodigoReposicion('');
+                                setResultadoReposicion(null);
+                                setErrorReposicion('');
+                              }}
+                              className="absolute right-2 p-1 text-gray-400 hover:text-white rounded-full hover:bg-gray-700/50 transition-colors"
+                            >
+                              <XMarkIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                         <button onClick={buscarTicketReposicion} disabled={cargandoReposicion || !codigoReposicion.trim()} className="bg-gray-700 text-gray-200 hover:bg-gray-600 px-4 rounded-lg text-sm font-medium transition-colors">Buscar</button>
                       </div>
                     </div>
@@ -314,7 +505,7 @@ export default function PublicPayment() {
                           <div><span className="text-gray-500 block">Ticket ID:</span><span className="font-mono font-semibold text-blue-400">{resultadoReposicion.ticket.id_ticket}</span></div>
                           <div><span className="text-gray-500 block">Estado:</span><span className={`font-semibold ${resultadoReposicion.ticket.estado_pago === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}`}>{resultadoReposicion.ticket.estado_pago}</span></div>
                         </div>
-                        <div className="border-t border-gray-800 pt-3 flex justify-between items-center"><span className="text-xs text-gray-500">Monto:</span><span className="text-xl font-bold text-emerald-400">$100.00 MXN</span></div>
+                        <div className="border-t border-gray-800 pt-3 flex justify-between items-center"><span className="text-xs text-gray-500">Monto:</span><span className="text-xl font-bold text-emerald-400">$150.00 MXN</span></div>
                         {resultadoReposicion.pagado && <div className="bg-emerald-950/30 border border-emerald-500/30 text-emerald-400 px-3 py-2 rounded text-center text-xs font-semibold animate-pulse">¡Pago registrado! Salida autorizada.</div>}
                       </div>
                     )}
@@ -335,7 +526,7 @@ export default function PublicPayment() {
           <div className="bg-gray-900/95 p-8 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] w-full max-w-md border border-gray-700/50 relative">
             <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-gray-500 hover:text-gray-200 transition-colors"><XMarkIcon className="h-5 w-5" /></button>
             <div className="text-center mb-6">
-              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><UserCircleIcon className="h-10 w-10 text-blue-400" /></div></div>
+              <div className="flex justify-center mb-3"><div className="p-3 bg-blue-900/30 rounded-xl border border-blue-500/30"><img src={icon} alt="BeneParc" className="h-16 w-16 object-contain" /></div></div>
               <h2 className="text-2xl font-bold text-gray-100">Acceso Admin</h2>
               <p className="text-gray-400 text-sm mt-1">Ingresa tus credenciales</p>
             </div>

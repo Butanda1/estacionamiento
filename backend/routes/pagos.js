@@ -3,19 +3,20 @@ const Ticket = require('../models/Ticket');
 const Pago = require('../models/Pago');
 const verificarToken = require('../middleware/auth');
 const { generarCodigo } = require('../utils/codigoGenerator');
+const { emitTicketUpdated, emitPagoCreated, emitTicketLost } = require('../socket/socketEvents');
 
 const router = express.Router();
 
 function calcularMontoAPagar(minutosTranscurridos) {
   if (minutosTranscurridos <= 5) return 0;
   const horas = Math.ceil(minutosTranscurridos / 60);
-  return horas * 15;
+  return horas * 10;
 }
 
 // POST /api/pagos/simular-pago
 router.post('/simular-pago', async (req, res) => {
   try {
-    const { ticket_id, id_ticket, _id } = req.body;
+    const { ticket_id, id_ticket, _id, codigo_descuento } = req.body;
     const codigoInput = (ticket_id || id_ticket || _id || '').trim().toUpperCase();
 
     if (!codigoInput) {
@@ -40,10 +41,26 @@ router.post('/simular-pago', async (req, res) => {
       return res.status(400).json({ error: 'Este ticket ya no está activo' });
     }
 
+    // Procesar descuento
+    let porcentajeDescuento = 0;
+    let montoDescuento = 0;
+    let codigoDescuentoAplicado = null;
+
+    if (codigo_descuento) {
+      const descuento = codigo_descuento.trim().toUpperCase();
+      if (descuento === '50OFF') {
+        porcentajeDescuento = 50;
+        codigoDescuentoAplicado = '50OFF';
+      } else if (descuento === '25OFF') {
+        porcentajeDescuento = 25;
+        codigoDescuentoAplicado = '25OFF';
+      }
+    }
+
     const ahora = new Date();
     
     if (ticket.tipo === 'Reposicion') {
-      const monto = 100;
+      const monto = 150;
       ticket.estado_pago = 'PAGADO';
       await ticket.save();
 
@@ -51,7 +68,13 @@ router.post('/simular-pago', async (req, res) => {
         ticket_id: ticket._id,
         fecha_pago: ahora,
         monto: monto,
+        codigo_descuento: codigoDescuentoAplicado,
+        porcentaje_descuento: porcentajeDescuento,
+        monto_descuento: montoDescuento,
       });
+
+      emitTicketUpdated(ticket);
+      emitPagoCreated(nuevoPago);
 
       return res.json({
         mensaje: 'Pago de reposición registrado exitosamente',
@@ -65,11 +88,13 @@ router.post('/simular-pago', async (req, res) => {
       });
     } else {
       const minutosTranscurridos = Math.round((ahora - ticket.fecha_entrada) / 60000);
-      const monto = calcularMontoAPagar(minutosTranscurridos);
+      let monto = calcularMontoAPagar(minutosTranscurridos);
 
       if (minutosTranscurridos <= 5) {
         ticket.estado_pago = 'EXENTO';
         await ticket.save();
+
+        emitTicketUpdated(ticket);
 
         return res.json({
           mensaje: 'Pago simulado como EXENTO (menor o igual a 5 minutos)',
@@ -81,6 +106,9 @@ router.post('/simular-pago', async (req, res) => {
           monto_pagado: 0,
         });
       } else {
+        montoDescuento = monto * (porcentajeDescuento / 100);
+        monto = monto - montoDescuento;
+
         ticket.estado_pago = 'PAGADO';
         await ticket.save();
 
@@ -88,7 +116,13 @@ router.post('/simular-pago', async (req, res) => {
           ticket_id: ticket._id,
           fecha_pago: ahora,
           monto: monto,
+          codigo_descuento: codigoDescuentoAplicado,
+          porcentaje_descuento: porcentajeDescuento,
+          monto_descuento: montoDescuento,
         });
+
+        emitTicketUpdated(ticket);
+        emitPagoCreated(nuevoPago);
 
         return res.json({
           mensaje: 'Pago simulado exitosamente',
@@ -132,8 +166,8 @@ router.post('/reportar-perdido', async (req, res) => {
     ticketOriginal.activo = false;
     await ticketOriginal.save();
 
-    // Crear pago de penalización ($100)
-    const PENALIZACION_PERDIDA = 100;
+    // Crear pago de penalización ($150)
+    const PENALIZACION_PERDIDA = 150;
     const pagoPenalizacion = await Pago.create({
       ticket_id: ticketOriginal._id,
       fecha_pago: new Date(),
@@ -159,8 +193,12 @@ router.post('/reportar-perdido', async (req, res) => {
       activo: true,
     });
 
+    emitTicketUpdated(ticketOriginal);
+    emitPagoCreated(pagoPenalizacion);
+    emitTicketLost(ticketOriginal, ticketReemplazo);
+
     return res.json({
-      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $100 MXN.',
+      mensaje: 'Ticket de reemplazo generado. Penalizacion aplicada: $150 MXN.',
       ticket_original: {
         ...ticketOriginal.toObject(),
         id_ticket: ticketOriginal._id,

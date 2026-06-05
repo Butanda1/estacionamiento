@@ -3,6 +3,7 @@ const Ticket = require('../models/Ticket');
 const verificarToken = require('../middleware/auth');
 const { checkExpiredTickets } = require('../utils/expiryScheduler');
 const { generarCodigo } = require('../utils/codigoGenerator');
+const { emitTicketCreated, emitTicketUpdated } = require('../socket/socketEvents');
 
 const router = express.Router();
 
@@ -27,6 +28,8 @@ router.post('/entrada', async (req, res) => {
       estado_pago: 'NO_PAGADO',
       activo: true,
     });
+
+    emitTicketCreated(nuevoTicket);
 
     return res.status(201).json({
       _id: nuevoTicket._id,
@@ -80,6 +83,8 @@ router.post('/validar-salida', async (req, res) => {
       ticket.fecha_salida = ahora;
       await ticket.save();
 
+      emitTicketUpdated(ticket);
+
       return res.json({
         autorizado: true,
         abrir_barrera: true,
@@ -93,6 +98,8 @@ router.post('/validar-salida', async (req, res) => {
       ticket.activo = false;
       ticket.fecha_salida = ahora;
       await ticket.save();
+
+      emitTicketUpdated(ticket);
 
       return res.json({
         autorizado: true,
@@ -284,6 +291,8 @@ router.post('/reposicion', async (req, res) => {
       activo: true,
       tipo: 'Reposicion',
     });
+
+    emitTicketCreated(nuevoTicket);
 
     return res.status(201).json({
       _id: nuevoTicket._id,
