@@ -6,7 +6,8 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   ClipboardDocumentIcon,
-  TicketIcon
+  TicketIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 export default function PaymentSimulator() {
@@ -104,11 +105,25 @@ export default function PaymentSimulator() {
         pagado: true,
         montoPagado: data.monto_pagado,
       }));
+
+      setTimeout(() => {
+        setResultado(null);
+        setIdTicket('');
+        setCodigoDescuento('');
+      }, 4000);
     } catch {
       setError('Error de conexión con el servidor');
     } finally {
       setCargando(false);
     }
+  };
+
+  const quitarTicket = () => {
+    setTimeout(() => {
+      setResultado(null);
+      setIdTicket('');
+      setCodigoDescuento('');
+    }, 3000);
   };
 
   const reportarPerdido = async () => {
@@ -238,11 +253,25 @@ export default function PaymentSimulator() {
       if (ticketReposicion && ticketReposicion.id_ticket === codigoReposicion.trim().toUpperCase()) {
         setTicketReposicion(prev => prev ? { ...prev, estado_pago: 'PAGADO' } : null);
       }
+
+      setTimeout(() => {
+        setResultadoReposicion(null);
+        setCodigoReposicion('');
+        setTicketReposicion(null);
+      }, 4000);
     } catch {
       setErrorReposicion('Error de conexión con el servidor');
     } finally {
       setCargandoReposicion(false);
     }
+  };
+
+  const quitarTicketReposicion = () => {
+    setTimeout(() => {
+      setResultadoReposicion(null);
+      setCodigoReposicion('');
+      setTicketReposicion(null);
+    }, 3000);
   };
 
   const copiarAlPortapapeles = (texto) => {
@@ -319,10 +348,19 @@ export default function PaymentSimulator() {
 
           {resultado && !resultado.perdido && (
             <div className="bg-gray-800/40 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.5)] p-6 space-y-6 border border-gray-700/50 backdrop-blur-md">
-              <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
-                Información del Ticket
-              </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+                  Información del Ticket
+                </h3>
+                <button
+                  onClick={quitarTicket}
+                  className="px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600 border border-gray-600 text-gray-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                  Quitar
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
                 <div>
@@ -366,7 +404,8 @@ export default function PaymentSimulator() {
                     value={codigoDescuento}
                     onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
                     placeholder="Ingrese código"
-                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all"
+                    disabled={codigoDescuento === '50OFF' || codigoDescuento === '25OFF'}
+                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
                   />
                 </div>
                 <div>
@@ -586,7 +625,14 @@ export default function PaymentSimulator() {
                 )}
 
                 {resultadoReposicion && (
-                  <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-4">
+                  <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 space-y-4 relative">
+                    <button
+                      onClick={quitarTicketReposicion}
+                      className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-400 transition-colors"
+                      title="Quitar"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
                     <div className="grid grid-cols-2 gap-4 text-xs">
                       <div>
                         <span className="text-gray-500 block mb-0.5">Ticket ID:</span>
