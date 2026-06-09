@@ -29,6 +29,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/pagos', require('./routes/pagos'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/descuentos', require('./routes/descuentos'));
 
 app.get('/api/health', (req, res) => {
   res.json({ estado: 'OK', servicio: 'Estacionamiento Inteligente API' });

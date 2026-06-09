@@ -1,6 +1,7 @@
 const express = require('express');
 const Ticket = require('../models/Ticket');
 const Pago = require('../models/Pago');
+const Descuento = require('../models/Descuento');
 const verificarToken = require('../middleware/auth');
 const { generarCodigo } = require('../utils/codigoGenerator');
 const { emitTicketUpdated, emitPagoCreated, emitTicketLost } = require('../socket/socketEvents');
@@ -41,26 +42,29 @@ router.post('/simular-pago', async (req, res) => {
       return res.status(400).json({ error: 'Este ticket ya no está activo' });
     }
 
-    // Procesar descuento
+    // Procesar descuento desde la base de datos o pre-aplicado en el ticket
     let porcentajeDescuento = 0;
     let montoDescuento = 0;
     let codigoDescuentoAplicado = null;
 
-    if (codigo_descuento) {
-      const descuento = codigo_descuento.trim().toUpperCase();
-      if (descuento === '50OFF') {
-        porcentajeDescuento = 50;
-        codigoDescuentoAplicado = '50OFF';
-      } else if (descuento === '25OFF') {
-        porcentajeDescuento = 25;
-        codigoDescuentoAplicado = '25OFF';
+    const codigoBuscar = codigo_descuento || ticket.codigo_descuento;
+
+    if (codigoBuscar) {
+      const codigoNorm = codigoBuscar.trim().toUpperCase();
+      const descuentoDB = await Descuento.findOne({ codigo: codigoNorm, activo: true });
+      if (descuentoDB) {
+        porcentajeDescuento = descuentoDB.porcentaje;
+        codigoDescuentoAplicado = descuentoDB.codigo;
       }
     }
 
     const ahora = new Date();
-    
+
     if (ticket.tipo === 'Reposicion') {
-      const monto = 150;
+      let montoOriginal = 150;
+      montoDescuento = montoOriginal * (porcentajeDescuento / 100);
+      let monto = montoOriginal - montoDescuento;
+
       ticket.estado_pago = 'PAGADO';
       await ticket.save();
 
@@ -68,6 +72,7 @@ router.post('/simular-pago', async (req, res) => {
         ticket_id: ticket._id,
         fecha_pago: ahora,
         monto: monto,
+        monto_original: montoOriginal,
         codigo_descuento: codigoDescuentoAplicado,
         porcentaje_descuento: porcentajeDescuento,
         monto_descuento: montoDescuento,
@@ -84,11 +89,17 @@ router.post('/simular-pago', async (req, res) => {
         },
         tiempo_estacionado_minutos: 0,
         monto_pagado: monto,
+        monto_original: montoOriginal,
+        descuento_aplicado: porcentajeDescuento > 0 ? {
+          codigo: codigoDescuentoAplicado,
+          porcentaje: porcentajeDescuento,
+          monto_descuento: montoDescuento,
+        } : null,
         pago: nuevoPago,
       });
     } else {
       const minutosTranscurridos = Math.round((ahora - ticket.fecha_entrada) / 60000);
-      let monto = calcularMontoAPagar(minutosTranscurridos);
+      let montoOriginal = calcularMontoAPagar(minutosTranscurridos);
 
       if (minutosTranscurridos <= 5) {
         ticket.estado_pago = 'EXENTO';
@@ -104,10 +115,11 @@ router.post('/simular-pago', async (req, res) => {
           },
           tiempo_estacionado_minutos: minutosTranscurridos,
           monto_pagado: 0,
+          monto_original: 0,
         });
       } else {
-        montoDescuento = monto * (porcentajeDescuento / 100);
-        monto = monto - montoDescuento;
+        montoDescuento = montoOriginal * (porcentajeDescuento / 100);
+        let monto = montoOriginal - montoDescuento;
 
         ticket.estado_pago = 'PAGADO';
         await ticket.save();
@@ -116,6 +128,7 @@ router.post('/simular-pago', async (req, res) => {
           ticket_id: ticket._id,
           fecha_pago: ahora,
           monto: monto,
+          monto_original: montoOriginal,
           codigo_descuento: codigoDescuentoAplicado,
           porcentaje_descuento: porcentajeDescuento,
           monto_descuento: montoDescuento,
@@ -132,6 +145,12 @@ router.post('/simular-pago', async (req, res) => {
           },
           tiempo_estacionado_minutos: minutosTranscurridos,
           monto_pagado: monto,
+          monto_original: montoOriginal,
+          descuento_aplicado: porcentajeDescuento > 0 ? {
+            codigo: codigoDescuentoAplicado,
+            porcentaje: porcentajeDescuento,
+            monto_descuento: montoDescuento,
+          } : null,
           pago: nuevoPago,
         });
       }
@@ -172,6 +191,7 @@ router.post('/reportar-perdido', async (req, res) => {
       ticket_id: ticketOriginal._id,
       fecha_pago: new Date(),
       monto: PENALIZACION_PERDIDA,
+      monto_original: PENALIZACION_PERDIDA,
     });
 
     // Generar ticket de reemplazo exento y activo
