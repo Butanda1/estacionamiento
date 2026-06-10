@@ -36,6 +36,18 @@ const ticketSchema = new mongoose.Schema(
       default: true,
       required: true,
     },
+    codigo_descuento: {
+      type: String,
+      default: null,
+    },
+    porcentaje_descuento: {
+      type: Number,
+      default: 0,
+    },
+    monto_descuento: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

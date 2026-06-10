@@ -1,5 +1,6 @@
 const express = require('express');
 const Ticket = require('../models/Ticket');
+const Descuento = require('../models/Descuento');
 const verificarToken = require('../middleware/auth');
 const { checkExpiredTickets } = require('../utils/expiryScheduler');
 const { generarCodigo } = require('../utils/codigoGenerator');
@@ -304,6 +305,110 @@ router.post('/reposicion', async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: 'Error al registrar ticket de reposición', detalle: error.message });
+  }
+});
+
+// POST /api/tickets/generar
+// Genera un ticket de prueba desde el Dashboard (solo admins)
+router.post('/generar', verificarToken, async (req, res) => {
+  try {
+    let codigo;
+    let existe = true;
+    while (existe) {
+      codigo = generarCodigo();
+      const ticketExistente = await Ticket.findById(codigo);
+      if (!ticketExistente) existe = false;
+    }
+
+    const nuevoTicket = await Ticket.create({
+      _id: codigo,
+      fecha_entrada: new Date(),
+      fecha_salida: null,
+      estado_pago: 'NO_PAGADO',
+      activo: true,
+      tipo: 'Normal',
+    });
+
+    emitTicketCreated(nuevoTicket);
+
+    return res.status(201).json({
+      _id: nuevoTicket._id,
+      id_ticket: nuevoTicket._id,
+      fecha_entrada: nuevoTicket.fecha_entrada,
+      estado_pago: nuevoTicket.estado_pago,
+      activo: nuevoTicket.activo,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error al generar ticket de prueba', detalle: error.message });
+  }
+});
+
+// POST /api/tickets/:id/aplicar-descuento
+// Asocia un código de descuento válido al ticket antes del pago
+router.post('/:id/aplicar-descuento', async (req, res) => {
+  try {
+    const ticketId = req.params.id.trim().toUpperCase();
+    const { codigo_descuento } = req.body;
+
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket no encontrado' });
+
+    if (ticket.estado_pago === 'PAGADO' || ticket.estado_pago === 'EXENTO') {
+      return res.status(400).json({ error: 'El ticket ya está pagado o es exento' });
+    }
+
+    const descuento = await Descuento.findOne({ codigo: codigo_descuento.trim().toUpperCase(), activo: true });
+    if (!descuento) {
+      return res.status(404).json({ error: 'Código de descuento inválido o no activo' });
+    }
+
+    ticket.codigo_descuento = descuento.codigo;
+    ticket.porcentaje_descuento = descuento.porcentaje;
+
+    // Calcular el monto descuento actual
+    const ahora = new Date();
+    const minutos = Math.max(0, Math.round((ahora - ticket.fecha_entrada) / 60000));
+    const montoOriginal = ticket.tipo === 'Reposicion' ? 150 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 10);
+    ticket.monto_descuento = montoOriginal * (descuento.porcentaje / 100);
+
+    await ticket.save();
+    emitTicketUpdated(ticket);
+
+    return res.json({
+      mensaje: 'Descuento aplicado al ticket',
+      ticket
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error al aplicar descuento al ticket', detalle: error.message });
+  }
+});
+
+// POST /api/tickets/:id/quitar-descuento
+// Remueve cualquier código de descuento asociado al ticket antes del pago
+router.post('/:id/quitar-descuento', async (req, res) => {
+  try {
+    const ticketId = req.params.id.trim().toUpperCase();
+
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket no encontrado' });
+
+    if (ticket.estado_pago === 'PAGADO' || ticket.estado_pago === 'EXENTO') {
+      return res.status(400).json({ error: 'No se puede quitar el descuento de un ticket ya pagado' });
+    }
+
+    ticket.codigo_descuento = null;
+    ticket.porcentaje_descuento = 0;
+    ticket.monto_descuento = 0;
+
+    await ticket.save();
+    emitTicketUpdated(ticket);
+
+    return res.json({
+      mensaje: 'Descuento removido del ticket',
+      ticket
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error al remover descuento del ticket', detalle: error.message });
   }
 });
 

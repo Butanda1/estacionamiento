@@ -35,6 +35,9 @@ export default function PublicPayment() {
   // Normal tab
   const [idTicket, setIdTicket] = useState('');
   const [codigoDescuento, setCodigoDescuento] = useState('');
+  const [descuentoAplicado, setDescuentoAplicado] = useState(null);
+  const [descuentoError, setDescuentoError] = useState('');
+  const [descuentoCargando, setDescuentoCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +71,7 @@ export default function PublicPayment() {
   const buscarTicket = async () => {
     if (!idTicket.trim()) return;
     setError(''); setResultado(null); setCargando(true);
+    setDescuentoAplicado(null); setDescuentoError(''); setCodigoDescuento('');
     try {
       const res = await fetch(`/api/tickets/${idTicket.trim().toUpperCase()}`);
       const data = await res.json();
@@ -81,15 +85,71 @@ export default function PublicPayment() {
       }
 
       const minutos = Math.max(0, Math.round((tiempoFinal - new Date(data.fecha_entrada)) / 60000));
-      let monto = data.tipo === 'Reposicion' ? 150 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 15);
+      let montoOriginal = data.tipo === 'Reposicion' ? 150 : (minutos <= 5 ? 0 : Math.ceil(minutos / 60) * 10);
 
-      // Si ya estaba pagado, respetamos el monto que se pagó realmente
-      if (data.estado_pago === 'PAGADO') monto = data.monto_pagado || monto;
-      if (data.estado_pago === 'EXENTO') monto = 0;
+      // Si ya pagado, extraer info de descuento del pago
+      const pagoConDesc = data.pagos_info?.find(p => p.codigo_descuento);
+      let montoFinal = montoOriginal;
+      if (data.estado_pago === 'PAGADO') {
+        montoFinal = data.monto_pagado || montoOriginal;
+        if (pagoConDesc) {
+          montoOriginal = pagoConDesc.monto_original || montoOriginal;
+          setDescuentoAplicado({ codigo: pagoConDesc.codigo_descuento, porcentaje: pagoConDesc.porcentaje_descuento, montoDescuento: pagoConDesc.monto_descuento });
+          setCodigoDescuento(pagoConDesc.codigo_descuento);
+        }
+      } else if (data.codigo_descuento) {
+        // Cargar descuento si ya estaba pre-aplicado en el ticket antes del pago
+        setDescuentoAplicado({ codigo: data.codigo_descuento, porcentaje: data.porcentaje_descuento });
+        setCodigoDescuento(data.codigo_descuento);
+        const descMonto = montoOriginal * (data.porcentaje_descuento / 100);
+        montoFinal = montoOriginal - descMonto;
+      }
+      if (data.estado_pago === 'EXENTO') { montoFinal = 0; montoOriginal = 0; }
 
-      setResultado({ ticket: data, minutosTranscurridos: minutos, montoCalculado: monto, esGratuito: monto === 0 && data.tipo !== 'Reposicion' });
+      setResultado({ ticket: data, minutosTranscurridos: minutos, montoCalculado: montoFinal, montoOriginal: montoOriginal, esGratuito: montoFinal === 0 && data.tipo !== 'Reposicion' });
     } catch { setError('Error de conexión con el servidor'); }
     finally { setCargando(false); }
+  };
+
+  const aplicarDescuento = async () => {
+    if (!codigoDescuento.trim() || !idTicket.trim()) return;
+    setDescuentoError(''); setDescuentoCargando(true);
+    try {
+      const res = await fetch(`/api/tickets/${idTicket.trim().toUpperCase()}/aplicar-descuento`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo_descuento: codigoDescuento.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setDescuentoError(data.error || 'Código inválido'); setDescuentoAplicado(null); return; }
+      setDescuentoAplicado({ codigo: data.ticket.codigo_descuento, porcentaje: data.ticket.porcentaje_descuento });
+      setDescuentoError('');
+      // Recalcular monto
+      if (resultado) {
+        const montoOrig = resultado.montoOriginal || resultado.montoCalculado;
+        const descMonto = montoOrig * (data.ticket.porcentaje_descuento / 100);
+        setResultado(prev => ({ ...prev, montoCalculado: montoOrig - descMonto, montoOriginal: montoOrig }));
+      }
+    } catch { setDescuentoError('Error de conexión'); }
+    finally { setDescuentoCargando(false); }
+  };
+
+  const quitarDescuento = async () => {
+    if (!idTicket.trim()) return;
+    setDescuentoError(''); setDescuentoCargando(true);
+    try {
+      const res = await fetch(`/api/tickets/${idTicket.trim().toUpperCase()}/quitar-descuento`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) { setDescuentoError(data.error || 'Error al quitar descuento'); return; }
+      setDescuentoAplicado(null); setCodigoDescuento(''); setDescuentoError('');
+      if (resultado) {
+        const montoOrig = resultado.montoOriginal || resultado.montoCalculado;
+        setResultado(prev => ({ ...prev, montoCalculado: montoOrig }));
+      }
+    } catch { setDescuentoError('Error de conexión'); }
+    finally { setDescuentoCargando(false); }
   };
 
   const simularPago = async () => {
@@ -99,27 +159,21 @@ export default function PublicPayment() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticket_id: idTicket.trim().toUpperCase(),
-          codigo_descuento: codigoDescuento.trim().toUpperCase() || null,
+          codigo_descuento: descuentoAplicado ? descuentoAplicado.codigo : null,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error al simular pago'); return; }
-      setResultado(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado }));
+      setResultado(prev => ({ ...prev, ticket: data.ticket, pagado: true, montoPagado: data.monto_pagado, montoOriginal: data.monto_original || prev.montoOriginal }));
       setTimeout(() => {
-        setResultado(null);
-        setIdTicket('');
-        setCodigoDescuento('');
+        setResultado(null); setIdTicket(''); setCodigoDescuento(''); setDescuentoAplicado(null);
       }, 2000);
     } catch { setError('Error de conexión'); }
     finally { setCargando(false); }
   };
 
   const quitarTicket = () => {
-    setTimeout(() => {
-      setResultado(null);
-      setIdTicket('');
-      setCodigoDescuento('');
-    },);
+    setResultado(null); setIdTicket(''); setCodigoDescuento(''); setDescuentoAplicado(null); setDescuentoError('');
   };
 
   const reportarPerdido = async () => {
@@ -333,48 +387,51 @@ export default function PublicPayment() {
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm bg-gray-900/30 p-4 rounded-lg border border-gray-700/50">
-                    <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
-                    <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
-                    <div>
+                    <div className="sm:col-span-2 md:col-span-3">
                       <span className="text-gray-500 block mb-1">Código de Descuento:</span>
-                      <input
-                        type="text"
-                        value={codigoDescuento}
-                        onChange={(e) => setCodigoDescuento(e.target.value.toUpperCase())}
-                        placeholder="Ingrese código"
-                        disabled={codigoDescuento === '50OFF' || codigoDescuento === '25OFF'}
-                        className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase text-white text-sm shadow-inner placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
-                      {(() => {
-                        let porcentajeDescuento = 0;
-                        if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
-                        else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
-
-                        const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 150);
-
-                        return (
-                          <div className="space-y-2">
-                            <div>
-                              <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
-                                {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${montoConDescuento.toLocaleString('es-MX')} MXN`}
-                              </span>
-                            </div>
-                            {porcentajeDescuento > 0 && !resultado.esGratuito && (
-                              <div className="text-xs space-y-1">
-                                <div className="text-gray-400">
-                                  Monto Original: <span className="text-gray-300 line-through">${resultado.montoCalculado.toLocaleString('es-MX')}</span>
-                                </div>
-                                <div className="text-emerald-400 font-semibold">
-                                  Descuento ({porcentajeDescuento}%): -${(resultado.montoCalculado * porcentajeDescuento / 150).toLocaleString('es-MX')}
-                                </div>
-                              </div>
-                            )}
+                      {resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE' ? (
+                        <div className="flex gap-2 items-start">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={codigoDescuento}
+                              onChange={(e) => { setCodigoDescuento(e.target.value.toUpperCase()); if (descuentoAplicado) { setDescuentoAplicado(null); setDescuentoError(''); } }}
+                              placeholder="código de descuento"
+                              disabled={!!descuentoAplicado}
+                              className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase text-white text-sm placeholder-gray-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-800/30"
+                            />
+                            {descuentoError && <p className="text-red-400 text-xs mt-1">{descuentoError}</p>}
+                            {descuentoAplicado && <p className="text-emerald-400 text-xs mt-1">✓ {descuentoAplicado.codigo} — {descuentoAplicado.porcentaje}% de descuento{descuentoAplicado.descripcion ? ` · ${descuentoAplicado.descripcion}` : ''}</p>}
                           </div>
-                        );
-                      })()}
+                          {!descuentoAplicado ? (
+                            <button onClick={aplicarDescuento} disabled={descuentoCargando || !codigoDescuento.trim()} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                              {descuentoCargando ? '...' : 'Aplicar'}
+                            </button>
+                          ) : (
+                            <button onClick={quitarDescuento} className="px-4 py-2 bg-red-900/50 hover:bg-red-800 border border-red-500/50 text-red-300 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                              Quitar
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        descuentoAplicado ? (
+                          <span className="text-violet-400 text-sm font-semibold">{descuentoAplicado.codigo} ({descuentoAplicado.porcentaje}%)</span>
+                        ) : (
+                          <span className="text-gray-600 text-sm">Sin descuento</span>
+                        )
+                      )}
+                    </div>
+                    <div><span className="text-gray-500 block mb-1">Entrada:</span><span className="text-gray-200">{new Date(resultado.ticket.fecha_entrada).toLocaleString('es-MX')}</span></div>
+                    <div><span className="text-gray-500 block mb-1">ID Ticket:</span><span className="font-mono font-bold text-blue-400 text-lg">{resultado.ticket.id_ticket}</span></div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
+                      <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                        {(() => {
+                          const horas = Math.floor(resultado.minutosTranscurridos / 60);
+                          const mins = resultado.minutosTranscurridos % 60;
+                          return horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
+                        })()}
+                      </span>
                     </div>
                     <div><span className="text-gray-500 block mb-1">Estado:</span>
                       {resultado.ticket.estado_pago === 'PAGADO' || resultado.ticket.estado_pago === 'EXENTO'
@@ -384,14 +441,24 @@ export default function PublicPayment() {
                         </span>}
                     </div>
                     <div>
-                      <span className="text-gray-500 block mb-1">Tiempo Transcurrido:</span>
-                      <span className={`text-xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
-                        {(() => {
-                          const horas = Math.floor(resultado.minutosTranscurridos / 60);
-                          const mins = resultado.minutosTranscurridos % 60;
-                          return horas > 0 ? `${horas}h ${mins}m` : `${mins} min`;
-                        })()}
-                      </span>
+                      <span className="text-gray-500 block mb-1">Monto a Pagar:</span>
+                      <div className="space-y-2">
+                        <div>
+                          <span className={`text-2xl font-bold ${resultado.esGratuito ? 'text-emerald-400' : 'text-blue-500'}`}>
+                            {resultado.esGratuito ? 'GRATIS (< 5 min)' : `$${resultado.montoCalculado.toLocaleString('es-MX')} MXN`}
+                          </span>
+                        </div>
+                        {descuentoAplicado && !resultado.esGratuito && resultado.montoOriginal > 0 && resultado.montoOriginal !== resultado.montoCalculado && (
+                          <div className="text-xs space-y-1">
+                            <div className="text-gray-400">
+                              Monto Original: <span className="text-gray-300 line-through">${resultado.montoOriginal.toLocaleString('es-MX')}</span>
+                            </div>
+                            <div className="text-emerald-400 font-semibold">
+                              Descuento ({descuentoAplicado.porcentaje}%): -${(resultado.montoOriginal - resultado.montoCalculado).toLocaleString('es-MX')}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {(resultado.ticket.estado_pago === 'NO_PAGADO' || resultado.ticket.estado_pago === 'PENDIENTE') && !resultado.pagado && (
@@ -400,24 +467,14 @@ export default function PublicPayment() {
                       <button onClick={reportarPerdido} disabled={cargando} className="flex-1 flex justify-center items-center gap-2 bg-red-900/50 border border-red-500/80 text-red-200 py-3 rounded-lg font-semibold hover:bg-red-800 transition-all disabled:opacity-50"><ExclamationTriangleIcon className="h-5 w-5" />Reportar Perdido</button>
                     </div>
                   )}
-                  {(() => {
-                    let porcentajeDescuento = 0;
-                    if (codigoDescuento === '50OFF') porcentajeDescuento = 50;
-                    else if (codigoDescuento === '25OFF') porcentajeDescuento = 25;
-
-                    const montoConDescuento = resultado.montoCalculado * (1 - porcentajeDescuento / 150);
-
-                    return (resultado.pagado || porcentajeDescuento > 0) ? (
-                      <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse space-y-2">
-                        {resultado.pagado && (
-                          <div>Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>
-                        )}
-                        {porcentajeDescuento > 0 && !resultado.esGratuito && (
-                          <div>Descuento ({porcentajeDescuento}%) Aplicado - Nuevo Total: ${montoConDescuento.toLocaleString('es-MX')} MXN</div>
-                        )}
-                      </div>
-                    ) : null;
-                  })()}
+                  {resultado.pagado && (
+                    <div className="bg-emerald-900/30 border border-emerald-500/50 text-emerald-400 px-4 py-4 rounded-lg text-center font-bold text-lg animate-pulse space-y-2">
+                      <div>Pago Registrado Exitosamente — ${(resultado.montoPagado || 0).toLocaleString('es-MX')} MXN</div>
+                      {descuentoAplicado && !resultado.esGratuito && (
+                        <div className="text-sm">Descuento ({descuentoAplicado.porcentaje}%) Aplicado · Código: {descuentoAplicado.codigo}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

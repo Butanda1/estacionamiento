@@ -197,7 +197,7 @@ export default function HistoryTable() {
                       const codigoCupon = pagoConDescuento?.codigo_descuento || null;
                       const porcentajeDesc = pagoConDescuento?.porcentaje_descuento || 0;
                       const montoDesc = pagoConDescuento?.monto_descuento || 0;
-                      const montoOriginal = montoDesc > 0 ? ticket.monto_pagado + montoDesc : null;
+                      const montoOriginal = pagoConDescuento?.monto_original || (montoDesc > 0 ? ticket.monto_pagado + montoDesc : null);
 
                       return (
                       <tr key={ticket._id} className="hover:bg-blue-900/20 transition-colors duration-200 text-gray-300">
@@ -257,7 +257,14 @@ export default function HistoryTable() {
                           )}
                         </td>
                         <td className="px-6 py-4 font-semibold text-gray-200">
-                          ${ticket.monto_pagado.toLocaleString('es-MX')}
+                          {montoOriginal && montoOriginal > ticket.monto_pagado ? (
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 line-through text-xs">${montoOriginal.toLocaleString('es-MX')}</span>
+                              <span className="text-emerald-400">${ticket.monto_pagado.toLocaleString('es-MX')}</span>
+                            </div>
+                          ) : (
+                            <span>${ticket.monto_pagado.toLocaleString('es-MX')}</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {codigoCupon ? (

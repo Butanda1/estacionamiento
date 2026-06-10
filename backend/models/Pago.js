@@ -16,6 +16,10 @@ const pagoSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    monto_original: {
+      type: Number,
+      default: 0,
+    },
     codigo_descuento: {
       type: String,
       default: null,
