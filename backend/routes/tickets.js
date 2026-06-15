@@ -357,8 +357,11 @@ router.post('/:id/aplicar-descuento', async (req, res) => {
       return res.status(400).json({ error: 'El ticket ya está pagado o es exento' });
     }
 
+    console.log("Se paro aqui")
+
     const descuento = await Descuento.findOne({ codigo: codigo_descuento.trim().toUpperCase(), activo: true });
     if (!descuento) {
+      console.log("No hay descuento")
       return res.status(404).json({ error: 'Código de descuento inválido o no activo' });
     }
 
