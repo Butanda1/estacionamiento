@@ -190,16 +190,29 @@ export default function PublicPayment() {
     finally { setCargando(false); }
   };
 
-  const emitirTicketReposicion = async () => {
-    setErrorReposicion(''); setTicketReposicion(null); setCargandoReposicion(true);
+ const emitirTicketReposicion = async () => {
+    setErrorReposicion(''); 
+    setTicketReposicion(null); 
+    setCargandoReposicion(true);
     try {
       const res = await fetch('/api/tickets/reposicion', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) { setErrorReposicion(data.error || 'Error'); return; }
+      
+      // 1. Muestra la información en la tarjeta de Emitir (Izquierda)
       setTicketReposicion(data);
+      
+      // 2. Llena el input de búsqueda en la tarjeta de Cobrar (Derecha)
       setCodigoReposicion(data.id_ticket);
-    } catch { setErrorReposicion('Error de conexión'); }
-    finally { setCargandoReposicion(false); }
+      
+      // 3. NUEVO: Poblamos directamente el resultado para cobrar sin tener que buscar
+      setResultadoReposicion({ ticket: data, montoCalculado: 150 });
+      
+    } catch { 
+      setErrorReposicion('Error de conexión'); 
+    } finally { 
+      setCargandoReposicion(false); 
+    }
   };
 
   const buscarTicketReposicion = async () => {
