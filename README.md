@@ -1,35 +1,37 @@
 # Sistema Automatizado de Control de Estacionamiento (IoT + Web)
 
-Sistema integral de gestión y automatización de acceso vehicular que conecta hardware embebido (**Arduino + ESP8266**) con una aplicación web full-stack (**Node.js + Express + MongoDB**). Permite el control de plumas de entrada/salida, generación y validación de tickets en tiempo real, cobro en línea y un panel administrativo con métricas del negocio.
+Sistema integral de gestión y automatización de acceso vehicular que conecta hardware embebido (**Arduino UNO + ESP8266 NodeMCU**) con una aplicación web full-stack en tiempo real (**MERN Stack + Socket.IO**). Permite el control de plumas de entrada/salida, generación y validación de tickets en vivo, cobro en línea y un panel administrativo con métricas dinámicas.
 
 ---
 
 ## Características Principales
 
 ### Hardware y Control de Acceso (IoT)
-* **Módulo de Entrada:** Detección de vehículos mediante sensores ultrasónicos, emisión automática de tickets únicos y apertura de pluma con servomotor.
-* **Módulo de Salida:** Lectura/ingreso de código de ticket mediante teclado matricial (Keypad 4x4), retroalimentación visual en pantalla LCD I2C y alertas sonoras (buzzer).
-* **Validación en Tiempo Real:** Comunicación serial entre Arduino UNO y módulo Wi-Fi **ESP8266 (NodeMCU)** para consultar el estado del ticket directamente contra la API antes de levantar la barrera de salida.
-* **Reglas de Negocio Automatizadas:** Tolerancia de salida gratuita (ej. estancias menores a 5 minutos) y bloqueo por tickets expirados o no pagados.
+* **Módulo de Entrada:** Detección de vehículos mediante sensores ultrasónicos (`HC-SR04`), emisión automática de tickets únicos y apertura de pluma con servomotor.
+* **Módulo de Salida:** Lectura de código de ticket mediante teclado matricial (`Keypad 4x4`), retroalimentación visual en pantalla `LCD 16x2 I2C` y alertas sonoras con buzzer activo.
+* **Validación en Tiempo Real:** Comunicación serial (`SoftwareSerial`) entre Arduino UNO y **ESP8266 NodeMCU** para consultar el estatus del ticket vía HTTP/HTTPS (`ArduinoJson`) antes de levantar la barrera.
+* **Reglas de Negocio Automatizadas:** Tolerancia de salida gratuita (estancias menores a 5 minutos) y bloqueo automático por tickets expirados o no pagados.
 
 ### Portal Web para Clientes (Sin Registro)
-* **Pago de Tickets:** Consulta de tarifa dinámica según el tiempo de estancia y procesamiento de pago directo mediante el folio del ticket.
+* **Pago de Tickets en Vivo:** Consulta de tarifa dinámica según el tiempo de estancia y procesamiento de pago directo mediante el folio del ticket.
 * **Gestión de Tickets Extraviados:** Flujo automatizado para generar y pagar un ticket de reposición con tarifa especial en caso de pérdida del boleto físico.
-* **Búsqueda y Estatus:** Verificación rápida del estado del boleto (activo, pagado, finalizado o perdido).
+* **Búsqueda y Estatus:** Verificación instantánea del estado del boleto (activo, pagado, finalizado o extraviado).
 
 ### Panel de Administración
-* **Dashboard Analítico:** Visualización de ingresos, flujo vehicular y estadísticas de uso mediante gráficas interactivas.
-* **Control de Registros:** Historial completo de entradas, salidas, pagos realizados y tickets de reposición/abandono.
-* **Gestión de Tarifas y Descuentos:** Administración centralizada de las reglas de cobro del estacionamiento.
+* **Dashboard Analítico:** Visualización de ingresos, flujo vehicular y estadísticas de uso en tiempo real mediante gráficas interactivas (**Recharts**).
+* **Actualizaciones en Vivo:** Sincronización instantánea de entradas, salidas y pagos mediante **Socket.IO**.
+* **Control de Registros y Seguridad:** Historial completo de movimientos y autenticación protegida con **JWT** y **bcryptjs**.
 
 ---
 
 ## Stack Tecnológico
 
-* **Hardware / Embebido:** Arduino UNO, Módulo Wi-Fi ESP8266, Sensores Ultrasónicos (HC-SR04), Servomotores, Pantalla LCD 16x2 (I2C), Teclado Matricial 4x4, Buzzer Activo.
-* **Backend:** Node.js, Express.js (API REST).
-* **Base de Datos:** MongoDB / MongoDB Atlas (colecciones relacionales para `tickets`, `pagos` y `descuentos`).
-* **Frontend:** HTML5, CSS3, JavaScript (Vanilla / Gráficas).
+| Capa / Módulo | Lenguaje(s) | Tecnologías y Librerías Clave |
+| :--- | :--- | :--- |
+| **Frontend (Cliente y Admin)** | JavaScript (React JSX), HTML5, CSS3 | React 18, Vite, React Router DOM, Tailwind CSS, Recharts, Socket.IO Client |
+| **Backend (API REST & Real-Time)** | JavaScript | Node.js, Express.js, Socket.IO, Mongoose, JWT (`jsonwebtoken`), `bcryptjs` |
+| **Base de Datos** | BSON / JSON (NoSQL) | MongoDB / MongoDB Atlas (modelado de `tickets`, `pagos` y `descuentos`) |
+| **Hardware / IoT** | C / C++ (Arduino / Wiring) | Arduino UNO, ESP8266 NodeMCU (`ESP8266WiFi`, `ArduinoJson`, `SoftwareSerial`, `LiquidCrystal_I2C`, `Servo`) |
 
 ---
 
@@ -39,12 +41,12 @@ Sistema integral de gestión y automatización de acceso vehicular que conecta h
 [Vehículo en Entrada/Salida]
         │
         ▼
-[Sensores / Keypad / Servo] ◄──► [Arduino UNO] ◄──(Serial)──► [ESP8266 Wi-Fi]
+[Sensores / Keypad / Servo] ◄──► [Arduino UNO] ◄──(Serial)──► [ESP8266 NodeMCU]
                                                                      │
                                                               (HTTP / REST API)
                                                                      │
                                                                      ▼
-[Portal Cliente / Admin Web] ◄─────────────────────────────► [Backend Node.js]
+[Portal Cliente / Admin React] ◄──(REST + Socket.IO)──────► [Backend Node.js/Express]
                                                                      │
                                                                      ▼
                                                              [MongoDB Atlas]
