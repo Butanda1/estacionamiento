@@ -4,9 +4,9 @@
 #include <SoftwareSerial.h>
 #include <ArduinoJson.h> 
 
-const char* ssid = "Python";
-const char* password = "Butanda18";
-const char* serverName = "https://estacionamiento-a75h.onrender.com/api/tickets/validar-salida"; 
+const char* ssid = "Nombrede la red";
+const char* password = "Contraseña";
+const char* serverName = "Link del Servidor"; 
 
 SoftwareSerial arduinoSerial(5, 4); // RX (D1), TX (D2)
 

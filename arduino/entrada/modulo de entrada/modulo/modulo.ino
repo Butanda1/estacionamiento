@@ -4,11 +4,10 @@
 #include <SoftwareSerial.h>
 #include <ArduinoJson.h> 
 
-const char* ssid = "Python";
-const char* password = "Butanda18";
-
-// nueva URL real en Render (con https://)
-const char* serverName = "https://estacionamiento-a75h.onrender.com/api/tickets/entrada"; 
+const char* ssid = "Nombrede la red";
+const char* password = "Contraseña";
+//En este proyecto se uso Render
+const char* serverName = "Link del Servidor"; 
 
 SoftwareSerial arduinoSerial(5, 4); // RX (D1), TX (D2)
 
@@ -16,10 +15,9 @@ void setup() {
   Serial.begin(115200); 
   arduinoSerial.begin(9600); 
 
-  // --- LAS DOS LÍNEAS NUEVAS ---
-  WiFi.disconnect(true); // Borra configuraciones viejas atoradas
+  WiFi.disconnect(true); 
   WiFi.mode(WIFI_STA);   // Le dice al chip: "Eres un cliente, no un módem"
-  delay(1000);           // Le damos un segundo para respirar
+  delay(1000);        
 
   WiFi.begin(ssid, password);
   Serial.println("\nConectando al WiFi...");
@@ -36,7 +34,7 @@ void loop() {
     String mensaje = arduinoSerial.readStringUntil('\n');
     mensaje.trim();
     
-    // ESTA LÍNEA ES NUEVA: Imprimirá TODO lo que escuche, aunque sea basura
+    
     Serial.println("Escuché algo en el cable: [" + mensaje + "]"); 
     
     if (mensaje == "PEDIR_TICKET") {
